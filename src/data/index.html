@@ -1,112 +1,150 @@
 <!DOCTYPE html>
-<html>
-  <head>
-    <title>EITAJE GLEEZE DASHBOARD</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link rel="icon" type="image/png" href="favicon.png">
-    <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.7.2/css/all.css" integrity="sha384-fnmOCqbTlWIlj8LyTjo7mOUStjsKC4pOpQbqyi7RrhN7udi9RwhKkMHpvLbHG9Sr" crossorigin="anonymous">
-    <link rel="stylesheet" type="text/css" href="style.css">
-    <script src="http://cdn.rawgit.com/Mikhus/canvas-gauges/gh-pages/download/2.1.7/all/gauge.min.js"></script>
-	<style>
-		html {font-family: Arial; display: inline-block; text-align: center;}
-		h2 {font-size: 3.0rem;}
-		p {font-size: 3.0rem;}
-		body {max-width: 600px; margin:0px auto; padding-bottom: 25px;}
-		.switch {position: relative; display: inline-block; width: 120px; height: 50px}
-		.switch input {display: none}
-		.slider {position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; border-radius: 24px}
-		.slider:before {position: absolute; content: ""; height: 36px; width: 52px; left: 8px; bottom: 8px; background-color: #fff; -webkit-transition: .4s; transition: .4s; border-radius: 40px}
-		input:checked+.slider {background-color: #d32121}
-		input:checked+.slider:before {-webkit-transform: translateX(52px); -ms-transform: translateX(52px); transform: translateX(52px)}
-		.myDiv {border: 5px outset red; background-color: lightblue; text-align: center;
-	</style>
-  </head>
-  <body>
-    <div class="topnav">
-      <h1>EITAJE SMART HOME SERVER</h1>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>EITAJE | Smart Home</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" type="image/png" href="favicon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <script src="http://cdn.rawgit.com/Mikhus/canvas-gauges/gh-pages/download/2.1.7/all/gauge.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <link rel="stylesheet" type="text/css" href="style.css">
+</head>
+<body>
+
+  <header class="header">
+    <div class="header-left">
+      <div class="logo">EITAJE</div>
+      <div class="logo-sub">Smart Home Dashboard</div>
     </div>
-	
-	<div class="myDiv">
-	<p  style="font-family:'Courier New';font-size:10px"> server state: <b><span id="serverState"><span></b></p>
-	<h3>Boiler is <span id="outputState"><span></h3>
-	<label class="switch"><input type="checkbox" onchange="toggleCheckbox(this)" id="output"><span class="slider"></span></label>
-	<script>function toggleCheckbox(element) {
-		var xhr = new XMLHttpRequest();
-		if(element.checked){ xhr.open("GET", "/button_update?state=1", true); }
-		else { xhr.open("GET", "/button_update?state=0", true); }
-		xhr.send();
-		}
-	setInterval(function ( ) {
-	  var xhttp = new XMLHttpRequest();
-	  
-	  xhttp.timeout = 2000;
-	  xhttp.ontimeout = function (e) {
-		// XMLHttpRequest timed out. Do something here.
-		document.getElementById("serverState").innerHTML = "offline";
-		};
-		
-	  xhttp.onreadystatechange = function() {
-		document.getElementById("serverState").innerHTML = "online";
-		if (this.readyState == 4 && this.status == 200) {
-		  var inputChecked;
-		  var outputStateM;
-		  const ans = this.responseText.split(",");
-		  if(ans[0] == 1){ 
-			inputChecked = true;
-			outputStateM = "On - " + ans[1] + " hours";
-		  }
-		  else { 
-			inputChecked = false;
-			outputStateM = "Off";
-		  }
-		  document.getElementById("output").checked = inputChecked;
-		  document.getElementById("outputState").innerHTML = outputStateM;
-		}
-	  };
-	  xhttp.open("GET", "/button_state", true);
-	  xhttp.send();
-	}, 1000 ) ;
-	</script>
-	<p></p>
-	</div>
-    <div class="content">
-      <div class="card-grid">
-        <div class="card">
-          <p class="card-title">Tank Temperature</p>
-          <canvas id="gauge-water-temperature"></canvas>
-        </div>
-		<div class="card">
-          <p class="card-title">Outside Temperature</p>
-          <canvas id="gauge-temperature"></canvas>
-        </div>
-	 </div>
-	 <p></p>
-	 <div class="card-grid">
-        <div class="card">
-          <p class="card-title">Outside Humidity</p>
-          <canvas id="gauge-humidity"></canvas>
-        </div>
-		<div class="card">
-          <p class="card-title">Light Intensity</p>
-		  <canvas data-type="radial-gauge" id="gauge-light" data-width="250" data-height="250"></canvas>
+    <div class="header-right">
+      <div class="status-pill">
+        <span class="status-dot" id="statusDot"></span>
+        <span id="serverState">connecting</span>
+      </div>
+      <div class="header-clock" id="headerClock"></div>
+    </div>
+  </header>
+
+  <!-- Tab navigation -->
+  <nav class="tab-nav">
+    <button class="tab-btn active" onclick="switchTab('live', this)">Live</button>
+    <button class="tab-btn" onclick="switchTab('history', this)">History</button>
+  </nav>
+
+  <main class="dashboard">
+
+    <!-- ── TAB 1: Live gauges ── -->
+    <div id="tab-live">
+
+      <div class="section-label">Sampling Rate</div>
+      <div class="card interval-card">
+        <span class="interval-label">Update every</span>
+        <div class="interval-bar">
+          <button class="interval-btn" data-ms="1000"  onclick="setSamplingInterval(1000,  this)">1s</button>
+          <button class="interval-btn" data-ms="2000"  onclick="setSamplingInterval(2000,  this)">2s</button>
+          <button class="interval-btn" data-ms="5000"  onclick="setSamplingInterval(5000,  this)">5s</button>
+          <button class="interval-btn" data-ms="10000" onclick="setSamplingInterval(10000, this)">10s</button>
+          <button class="interval-btn" data-ms="30000" onclick="setSamplingInterval(30000, this)">30s</button>
+          <button class="interval-btn" data-ms="60000" onclick="setSamplingInterval(60000, this)">1m</button>
         </div>
       </div>
-      <p></p>
-      <div class="card-grid">
-        <div class="card">
-          <p class="card-title">CO2 (ppm)</p>
+
+      <div class="section-label">Boiler Control</div>
+      <div class="card boiler-card">
+        <div class="boiler-left">
+          <div class="boiler-label">Heating System</div>
+          <div class="boiler-state" id="outputState">—</div>
+        </div>
+        <div class="boiler-right">
+          <label class="toggle">
+            <input type="checkbox" id="output" onchange="toggleCheckbox(this)">
+            <span class="toggle-track"></span>
+          </label>
+        </div>
+      </div>
+
+      <div class="section-label">Climate</div>
+      <div class="gauge-grid">
+        <div class="card gauge-card">
+          <div class="card-head"><span class="card-name">Tank Temperature</span><span class="card-unit">°C</span></div>
+          <canvas id="gauge-water-temperature"></canvas>
+        </div>
+        <div class="card gauge-card">
+          <div class="card-head"><span class="card-name">Ambient Temperature</span><span class="card-unit">°C</span></div>
+          <canvas id="gauge-temperature"></canvas>
+        </div>
+        <div class="card gauge-card">
+          <div class="card-head"><span class="card-name">Humidity</span><span class="card-unit">%</span></div>
+          <canvas id="gauge-humidity"></canvas>
+        </div>
+        <div class="card gauge-card">
+          <div class="card-head"><span class="card-name">Light Intensity</span><span class="card-unit">lux</span></div>
+          <canvas id="gauge-light"></canvas>
+        </div>
+      </div>
+
+      <div class="section-label">Air Quality — ENS160</div>
+      <div class="gauge-grid">
+        <div class="card gauge-card">
+          <div class="card-head"><span class="card-name">CO2</span><span class="card-unit">ppm</span></div>
           <canvas id="gauge-co2"></canvas>
         </div>
-        <div class="card">
-          <p class="card-title">VOC (ppb)</p>
+        <div class="card gauge-card">
+          <div class="card-head"><span class="card-name">VOC</span><span class="card-unit">ppb</span></div>
           <canvas id="gauge-voc"></canvas>
         </div>
-        <div class="card">
-          <p class="card-title">Air Quality Index</p>
+        <div class="card gauge-card">
+          <div class="card-head"><span class="card-name">Air Quality Index</span><span class="card-unit">1 – 5</span></div>
           <canvas id="gauge-aqi"></canvas>
         </div>
       </div>
-    </div>
-    <script src="script.js"></script>
-  </body>
+
+    </div><!-- /tab-live -->
+
+    <!-- ── TAB 2: History charts ── -->
+    <div id="tab-history" style="display:none">
+
+      <div class="section-label" style="display:flex;justify-content:space-between;align-items:center">
+        <span>Sample History</span>
+        <div style="display:flex;gap:8px">
+          <button class="refresh-btn" onclick="loadCharts()">↻ Refresh</button>
+          <button class="refresh-btn active" id="maToggleBtn" onclick="toggleMA()">◎ Moving Avg</button>
+        </div>
+      </div>
+
+      <div class="chart-grid">
+        <div class="card chart-card">
+          <div class="card-head"><span class="card-name">Temperature</span><span class="card-unit">°C</span></div>
+          <canvas id="chart-temp"></canvas>
+        </div>
+        <div class="card chart-card">
+          <div class="card-head"><span class="card-name">Humidity</span><span class="card-unit">%</span></div>
+          <canvas id="chart-hum"></canvas>
+        </div>
+        <div class="card chart-card">
+          <div class="card-head"><span class="card-name">Light Intensity</span><span class="card-unit">lux</span></div>
+          <canvas id="chart-light"></canvas>
+        </div>
+        <div class="card chart-card">
+          <div class="card-head"><span class="card-name">CO2</span><span class="card-unit">ppm</span></div>
+          <canvas id="chart-co2"></canvas>
+        </div>
+        <div class="card chart-card">
+          <div class="card-head"><span class="card-name">VOC</span><span class="card-unit">ppb</span></div>
+          <canvas id="chart-voc"></canvas>
+        </div>
+        <div class="card chart-card">
+          <div class="card-head"><span class="card-name">Air Quality Index</span><span class="card-unit">1 – 5</span></div>
+          <canvas id="chart-aqi"></canvas>
+        </div>
+      </div>
+
+    </div><!-- /tab-history -->
+
+  </main>
+
+  <script src="script.js"></script>
+</body>
 </html>
