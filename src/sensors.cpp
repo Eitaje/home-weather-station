@@ -80,8 +80,9 @@ String getSensorReadings() {
   readings["AQI"]               = String(AQI_buffer.last());
   readings["VOC"]               = String(VOC_buffer.last());
   readings["CO2"]               = String(CO2_buffer.last());
-  // readings["HIC"]               = String(hic_buffer.last());
-  //readings["pressure"]          = String(bmp388_pressure_buffer.last());
+  readings["timestamp"]         = current_time_buffer.isEmpty()
+                                    ? String("0")
+                                    : String(current_time_buffer.last());
   return JSON.stringify(readings);
 }
 
@@ -101,7 +102,7 @@ void sample_sensor_ENS160_callback() {
   float t = temp.temperature;
   float h = hum.relative_humidity;
 
-  temperature = t;
+  temperature = t -3; // esn160 seem to be off by +3 degrees
   humidity = h;
 
   temperature_buffer.push(t);

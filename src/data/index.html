@@ -31,25 +31,13 @@
   <nav class="tab-nav">
     <button class="tab-btn active" onclick="switchTab('live', this)">Live</button>
     <button class="tab-btn" onclick="switchTab('history', this)">History</button>
+    <button class="tab-btn" onclick="switchTab('config', this)">Config</button>
   </nav>
 
   <main class="dashboard">
 
     <!-- ── TAB 1: Live gauges ── -->
     <div id="tab-live">
-
-      <div class="section-label">Sampling Rate</div>
-      <div class="card interval-card">
-        <span class="interval-label">Update every</span>
-        <div class="interval-bar">
-          <button class="interval-btn" data-ms="1000"  onclick="setSamplingInterval(1000,  this)">1s</button>
-          <button class="interval-btn" data-ms="2000"  onclick="setSamplingInterval(2000,  this)">2s</button>
-          <button class="interval-btn" data-ms="5000"  onclick="setSamplingInterval(5000,  this)">5s</button>
-          <button class="interval-btn" data-ms="10000" onclick="setSamplingInterval(10000, this)">10s</button>
-          <button class="interval-btn" data-ms="30000" onclick="setSamplingInterval(30000, this)">30s</button>
-          <button class="interval-btn" data-ms="60000" onclick="setSamplingInterval(60000, this)">1m</button>
-        </div>
-      </div>
 
       <div class="section-label">Boiler Control</div>
       <div class="card boiler-card">
@@ -142,6 +130,24 @@
       </div>
 
     </div><!-- /tab-history -->
+
+    <!-- ── TAB 3: Config ── -->
+    <div id="tab-config" style="display:none">
+
+      <div class="section-label">Sampling Rate</div>
+      <div class="card interval-card">
+        <span class="interval-label">Update every</span>
+        <div class="interval-bar">
+          <button class="interval-btn" data-ms="1000"  onclick="setSamplingInterval(1000,  this)">1s</button>
+          <button class="interval-btn" data-ms="2000"  onclick="setSamplingInterval(2000,  this)">2s</button>
+          <button class="interval-btn" data-ms="5000"  onclick="setSamplingInterval(5000,  this)">5s</button>
+          <button class="interval-btn" data-ms="10000" onclick="setSamplingInterval(10000, this)">10s</button>
+          <button class="interval-btn" data-ms="30000" onclick="setSamplingInterval(30000, this)">30s</button>
+          <button class="interval-btn" data-ms="60000" onclick="setSamplingInterval(60000, this)">1m</button>
+        </div>
+      </div>
+
+    </div><!-- /tab-config -->
 
   </main>
 

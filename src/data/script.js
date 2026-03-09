@@ -196,9 +196,15 @@ var gaugeAQI = new RadialGauge(Object.assign({}, darkRadial, {
 function switchTab(name, btn) {
     document.getElementById('tab-live').style.display    = name === 'live'    ? '' : 'none';
     document.getElementById('tab-history').style.display = name === 'history' ? '' : 'none';
+    document.getElementById('tab-config').style.display  = name === 'config'  ? '' : 'none';
     document.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.remove('active'); });
     btn.classList.add('active');
-    if (name === 'history') loadCharts();
+    if (name === 'history') {
+        loadCharts();
+        startHistoryPolling(currentIntervalMs);
+    } else {
+        stopHistoryPolling();
+    }
 }
 
 // ── Chart.js shared defaults ──────────────────────────────────────────────────
@@ -385,9 +391,34 @@ function getReadings() {
 }
 
 // ── Sampling interval control ─────────────────────────────────────────────────
+var readingsTimer = null;
+var historyTimer  = null;
+var currentIntervalMs = 5000;
+
+function startReadingsPolling(ms) {
+    currentIntervalMs = ms;
+    if (readingsTimer) clearInterval(readingsTimer);
+    readingsTimer = setInterval(getReadings, ms);
+    // If history tab is open, restart its timer at the new rate too
+    var histTab = document.getElementById('tab-history');
+    if (histTab && histTab.style.display !== 'none') {
+        startHistoryPolling(ms);
+    }
+}
+
+function startHistoryPolling(ms) {
+    if (historyTimer) clearInterval(historyTimer);
+    historyTimer = setInterval(loadCharts, ms);
+}
+
+function stopHistoryPolling() {
+    if (historyTimer) { clearInterval(historyTimer); historyTimer = null; }
+}
+
 function setSamplingInterval(ms, btn) {
     document.querySelectorAll('.interval-btn').forEach(function(b) { b.classList.remove('active'); });
     if (btn) btn.classList.add('active');
+    startReadingsPolling(ms);
     var xhr = new XMLHttpRequest();
     xhr.open('GET', '/set_reporting_interval?sample_interval=' + ms, true);
     xhr.send();
@@ -395,16 +426,16 @@ function setSamplingInterval(ms, btn) {
 
 window.addEventListener('load', function() {
     getReadings();
-    setInterval(getReadings, 5000);
 
-    // Highlight the current sampling interval
+    // Read current sampling interval, sync polling rate, highlight active button
     var xhr = new XMLHttpRequest();
     xhr.onreadystatechange = function() {
-        if (this.readyState === 4 && this.status === 200) {
-            var ms = parseInt(this.responseText.trim());
-            var btn = document.querySelector('.interval-btn[data-ms="' + ms + '"]');
-            if (btn) btn.classList.add('active');
-        }
+        var ms = (this.readyState === 4 && this.status === 200)
+            ? parseInt(this.responseText.trim())
+            : 5000; // fallback
+        var btn = document.querySelector('.interval-btn[data-ms="' + ms + '"]');
+        if (btn) btn.classList.add('active');
+        startReadingsPolling(ms);
     };
     xhr.open('GET', '/get_reporting_interval', true);
     xhr.send();

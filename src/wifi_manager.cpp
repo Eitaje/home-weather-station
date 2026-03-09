@@ -19,7 +19,7 @@ static IPAddress gateway(192, 168, 3, 1);
 static IPAddress subnet(255, 255, 255, 0);
 
 void initWiFi() {
-  if (!WiFi.config(local_IP, gateway, subnet)) {
+  if (!WiFi.config(local_IP, gateway, subnet, gateway)) {
     Serial.println("STA Failed to configure");
   }
   Serial.println("Connecting to ");
