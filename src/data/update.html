@@ -55,47 +55,102 @@
     <a class="back-link" href="/">← Back to dashboard</a>
   </div>
 </main>
+<!-- SparkMD5: used to compute MD5 hash required by AsyncElegantOTA -->
+<script src="https://cdn.jsdelivr.net/npm/spark-md5@3.0.2/spark-md5.min.js"></script>
 <script>
+var otaDelay = 20; // default; overwritten on load from /ota_delay
+window.addEventListener('load', function() {
+  var xhr = new XMLHttpRequest();
+  xhr.onreadystatechange = function() {
+    if (this.readyState === 4 && this.status === 200) {
+      var n = parseInt(this.responseText.trim());
+      if (n > 0) otaDelay = n;
+    }
+  };
+  xhr.open('GET', '/ota_delay', true);
+  xhr.send();
+});
+function computeMD5(file, onProgress, onDone) {
+  var chunkSize = 2 * 1024 * 1024; // 2 MB slices
+  var chunks    = Math.ceil(file.size / chunkSize);
+  var chunk     = 0;
+  var spark     = new SparkMD5.ArrayBuffer();
+  var reader    = new FileReader();
+
+  reader.onload = function(e) {
+    spark.append(e.target.result);
+    chunk++;
+    onProgress(Math.round(chunk / chunks * 100));
+    if (chunk < chunks) readChunk();
+    else onDone(spark.end());
+  };
+
+  function readChunk() {
+    var start = chunk * chunkSize;
+    reader.readAsArrayBuffer(file.slice(start, start + chunkSize));
+  }
+  readChunk();
+}
+
 function startUpload() {
   var file = document.getElementById('firmwareFile').files[0];
   if (!file) { document.getElementById('statusMsg').textContent = 'Select a .bin file first.'; return; }
 
-  var btn         = document.getElementById('uploadBtn');
+  var btn          = document.getElementById('uploadBtn');
   var progressWrap = document.getElementById('progressWrap');
   var progressBar  = document.getElementById('progressBar');
   var statusMsg    = document.getElementById('statusMsg');
 
   btn.disabled = true;
   progressWrap.style.display = 'block';
-  statusMsg.textContent = 'Uploading…';
+  statusMsg.textContent = 'Computing MD5…';
 
-  var xhr = new XMLHttpRequest();
-  xhr.upload.onprogress = function(e) {
-    if (e.lengthComputable) {
-      var pct = Math.round(e.loaded / e.total * 100);
-      progressBar.style.width = pct + '%';
-      statusMsg.textContent = 'Uploading… ' + pct + '%';
-    }
-  };
-  xhr.onload = function() {
-    if (xhr.status === 200 && xhr.responseText.indexOf('OK') !== -1) {
-      progressBar.style.width = '100%';
-      statusMsg.textContent = 'Update successful — device is rebooting…';
-      startCountdown(20);
-    } else {
-      statusMsg.textContent = 'Update failed: ' + xhr.responseText;
-      btn.disabled = false;
-    }
-  };
-  xhr.onerror = function() {
-    statusMsg.textContent = 'Connection lost during upload.';
-    btn.disabled = false;
-  };
+  computeMD5(file,
+    function(pct) {
+      progressBar.style.width = (pct * 0.1) + '%'; // 0–10% for hashing
+      statusMsg.textContent = 'Computing MD5… ' + pct + '%';
+    },
+    function(md5) {
+      statusMsg.textContent = 'Uploading…';
 
-  var fd = new FormData();
-  fd.append('update', file, file.name);
-  xhr.open('POST', '/update', true);
-  xhr.send(fd);
+      var uploadCompleted = false;
+      var xhr = new XMLHttpRequest();
+      xhr.upload.onprogress = function(e) {
+        if (e.lengthComputable) {
+          var pct = Math.round(e.loaded / e.total * 100);
+          progressBar.style.width = (10 + pct * 0.9) + '%'; // 10–100%
+          statusMsg.textContent = 'Uploading… ' + pct + '%';
+          if (pct === 100) uploadCompleted = true;
+        }
+      };
+      xhr.onload = function() {
+        if (xhr.status === 200 && xhr.responseText.trim() !== 'FAIL') {
+          progressBar.style.width = '100%';
+          statusMsg.textContent = 'Update successful — device is rebooting…';
+          startCountdown(otaDelay);
+        } else {
+          statusMsg.textContent = 'Update failed: ' + xhr.responseText;
+          btn.disabled = false;
+        }
+      };
+      xhr.onerror = function() {
+        if (uploadCompleted) {
+          progressBar.style.width = '100%';
+          statusMsg.textContent = 'Update successful — device is rebooting…';
+          startCountdown(otaDelay);
+        } else {
+          statusMsg.textContent = 'Connection error during upload.';
+          btn.disabled = false;
+        }
+      };
+
+      var fd = new FormData();
+      fd.append('MD5', md5);
+      fd.append('update', file, file.name);
+      xhr.open('POST', '/update', true);
+      xhr.send(fd);
+    }
+  );
 }
 
 function startCountdown(sec) {

@@ -28,7 +28,24 @@ AsyncEventSource events("/events");
 boolean       boiler_state              = true;
 unsigned long boiler_turned_on_timestamp = 0;
 
+// ── OTA reboot delay (seconds, persisted to EEPROM) ───────────────────────────
+int ota_reboot_delay = OTA_REBOOT_DELAY;
+
 // ── EEPROM helpers ────────────────────────────────────────────────────────────
+static void readOtaDelayParam() {
+  int     new_delay = 0;
+  byte    value;
+  int     index     = 0;
+
+  while (index < 8) {
+    value = EEPROM.read(ota_reboot_delay_address + index);
+    if (value == 0) break;
+    new_delay += (value - 48) * (int)pow(10, index);
+    index++;
+  }
+  if (new_delay >= 5) ota_reboot_delay = new_delay;
+}
+
 void readSamplingFreqParamer() {
   int     new_reporting_interval = 0;
   byte    value;
@@ -153,6 +170,7 @@ static void handle_NotFound(AsyncWebServerRequest *request) {
 
 // ── Server init ───────────────────────────────────────────────────────────────
 void initWebServer() {
+  readOtaDelayParam();
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
     if (LittleFS.exists("/index.html"))
       request->send(LittleFS, "/index.html", "text/html");
@@ -228,6 +246,30 @@ void initWebServer() {
 
   server.on("/version", HTTP_GET, [](AsyncWebServerRequest *request) {
     request->send(200, "text/plain", FIRMWARE_VERSION);
+  });
+
+  server.on("/ota_delay", HTTP_GET, [](AsyncWebServerRequest *request) {
+    request->send(200, "text/plain", String(ota_reboot_delay));
+  });
+
+  server.on("/set_ota_delay", HTTP_GET, [](AsyncWebServerRequest *request) {
+    if (!request->authenticate(http_username, http_password))
+      return request->requestAuthentication();
+    if (request->hasParam("delay")) {
+      String val = request->getParam("delay")->value();
+      int d = val.toInt();
+      if (d >= 5 && d <= 300) {
+        ota_reboot_delay = d;
+        int index = 0;
+        for (int x = val.length() - 1; x >= 0; x--)
+          EEPROM.write(ota_reboot_delay_address + index++, val[x]);
+        EEPROM.write(ota_reboot_delay_address + val.length(), (char)0);
+        EEPROM.commit();
+      }
+      request->send(200, "text/plain", String(ota_reboot_delay));
+    } else {
+      request->send(400, "text/plain", "delay parameter missing");
+    }
   });
 
   server.on("/update", HTTP_GET, [](AsyncWebServerRequest *request) {

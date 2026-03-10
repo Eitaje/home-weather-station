@@ -147,6 +147,19 @@
         </div>
       </div>
 
+      <div class="section-label">OTA Reboot Delay</div>
+      <div class="card interval-card">
+        <span class="interval-label">Wait after upload</span>
+        <div class="interval-bar" style="align-items:center;gap:8px">
+          <input type="number" id="otaDelayInput" min="5" max="300" value="20"
+                 style="width:64px;font-family:var(--font-mono);font-size:0.82rem;
+                        padding:5px 8px;border:1px solid #e2e8f0;border-radius:6px;
+                        background:#f8fafc;color:var(--text-main);text-align:center">
+          <span style="font-size:0.78rem;color:var(--text-muted)">seconds</span>
+          <button class="interval-btn" onclick="setOtaDelay(this)">Set</button>
+        </div>
+      </div>
+
     </div><!-- /tab-config -->
 
   </main>

@@ -415,6 +415,19 @@ function stopHistoryPolling() {
     if (historyTimer) { clearInterval(historyTimer); historyTimer = null; }
 }
 
+function setOtaDelay(btn) {
+    var input = document.getElementById('otaDelayInput');
+    var val = parseInt(input.value);
+    if (isNaN(val) || val < 5)   val = 5;
+    if (val > 300)               val = 300;
+    input.value = val;
+    btn.classList.add('active');
+    setTimeout(function() { btn.classList.remove('active'); }, 1000);
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', '/set_ota_delay?delay=' + val, true);
+    xhr.send();
+}
+
 function setSamplingInterval(ms, btn) {
     document.querySelectorAll('.interval-btn').forEach(function(b) { b.classList.remove('active'); });
     if (btn) btn.classList.add('active');
@@ -439,6 +452,18 @@ window.addEventListener('load', function() {
     };
     xhr.open('GET', '/get_reporting_interval', true);
     xhr.send();
+
+    // Populate OTA delay input
+    var dxhr = new XMLHttpRequest();
+    dxhr.onreadystatechange = function() {
+        if (this.readyState === 4 && this.status === 200) {
+            var n = parseInt(this.responseText.trim());
+            var el = document.getElementById('otaDelayInput');
+            if (el && n >= 5) el.value = n;
+        }
+    };
+    dxhr.open('GET', '/ota_delay', true);
+    dxhr.send();
 
     // Fetch firmware version and display in header
     var vxhr = new XMLHttpRequest();
