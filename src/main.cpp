@@ -61,6 +61,7 @@ void task_initiator_callback() {
   task_sample_water_temp.setInterval(reporting_interval);
   task_sample_BH1750.setInterval(reporting_interval);
   task_update_date_time.setInterval(reporting_interval);
+  task_send_new_readings_event.setInterval(reporting_interval);
 
   task_sample_ENS160.enable();
   task_sample_water_temp.enableDelayed(1000);

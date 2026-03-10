@@ -443,9 +443,8 @@ window.addEventListener('load', function() {
     // Read current sampling interval, sync polling rate, highlight active button
     var xhr = new XMLHttpRequest();
     xhr.onreadystatechange = function() {
-        var ms = (this.readyState === 4 && this.status === 200)
-            ? parseInt(this.responseText.trim())
-            : 5000; // fallback
+        if (this.readyState !== 4) return;
+        var ms = (this.status === 200) ? parseInt(this.responseText.trim()) : 5000;
         var btn = document.querySelector('.interval-btn[data-ms="' + ms + '"]');
         if (btn) btn.classList.add('active');
         startReadingsPolling(ms);
