@@ -14,9 +14,9 @@ extern Task task_update_date_time;
 extern Task task_send_new_readings_event;
 extern Task task_check_wifi_connected;
 
-static IPAddress local_IP(192, 168, 3, 44);
-static IPAddress gateway(192, 168, 3, 1);
-static IPAddress subnet(255, 255, 255, 0);
+static IPAddress local_IP(DEVICE_IP);
+static IPAddress gateway(GATEWAY_IP);
+static IPAddress subnet(SUBNET_MASK);
 
 void initWiFi() {
   if (!WiFi.config(local_IP, gateway, subnet, gateway)) {

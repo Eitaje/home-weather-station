@@ -14,28 +14,50 @@ An ESP8266 NodeMCU v2-based WiFi weather station and boiler controller, serving 
 
 ## Network
 
-- Static IP: `192.168.3.44`, gateway `192.168.3.1`
+- Static IP and gateway are configured in `src/pwd.h` (not committed — see `src/pwd.h.example`)
 - NTP: `pool.ntp.org` at GMT+2
-- Credentials stored in `src/pwd.h` (not committed)
 
 ## Build & Flash
 
 This is a **PlatformIO** project.
 
+### Build
+
 ```bash
-# Build firmware
-pio run
-
-# Flash firmware
-pio run -t upload
-
-# Upload web UI files (LittleFS)
-pio run -t uploadfs
+pio run                 # compile firmware only
+pio run -t upload       # compile + flash firmware
+pio run -t uploadfs     # compile + upload LittleFS web UI files (index.html, script.js, style.css)
 ```
 
-The upload port is set to `COM12` in `platformio.ini` — change it to match your system.
+### Upload method 1 — Serial (USB cable)
 
-Close any serial monitor before uploading (it holds the COM port).
+Default method. Port is set to `COM12` in `platformio.ini`; change it to match your system.
+
+```bash
+pio run -t upload
+```
+
+> Close any serial monitor before uploading — it holds the COM port.
+
+### Upload method 2 — Browser OTA (no cable required)
+
+`AsyncElegantOTA` serves an upload page at `/update` (auth required).
+
+1. Build the binary: `pio run`
+2. Open `http://<DEVICE_IP>/update` in a browser and enter credentials
+3. Upload `.pio/build/nodemcuv2/firmware.bin`
+
+> For LittleFS (web UI files) there is no browser OTA equivalent — use `pio run -t uploadfs` over serial.
+
+### Version
+
+The firmware version is defined in `platformio.ini`:
+
+```ini
+build_flags = -D FIRMWARE_VERSION='"1.01"'
+```
+
+It is exposed at `/version` and displayed in the dashboard header.
 
 ## Web Endpoints
 
@@ -49,7 +71,8 @@ Close any serial monitor before uploading (it holds the COM port).
 | `/button_update?state=1\|0` | Toggle boiler relay |
 | `/set_reporting_interval?sample_interval=N` | Set sampling interval in ms (auth required) |
 | `/get_reporting_interval` | Read current sampling interval |
-| `/update` | OTA firmware update (auth required) |
+| `/update` | OTA firmware update via browser (auth required) |
+| `/version` | Firmware version string (plain text) |
 
 ## Web UI
 

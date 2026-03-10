@@ -1,0 +1,12 @@
+// Copy this file to pwd.h and fill in your values.
+// pwd.h is gitignored — never commit real credentials or IPs.
+
+// ── WiFi credentials ──────────────────────────────────────────────────────────
+const char* ssid     = "your-ssid";
+const char* password = "your-password";
+
+// ── Static network config ─────────────────────────────────────────────────────
+// Define each address as four comma-separated octets.
+#define DEVICE_IP   10,  0,  0,  1    // IP assigned to this device
+#define GATEWAY_IP  10,  0,  0,  1    // Router / default gateway
+#define SUBNET_MASK 255, 255, 255, 0

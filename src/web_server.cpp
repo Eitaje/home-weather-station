@@ -144,7 +144,7 @@ static void handle_write_param(AsyncWebServerRequest *request) {
 
 static void handle_read_param(AsyncWebServerRequest *request) {
   readSamplingFreqParamer();
-  request->send(200, "text/html", SendHTML("Data reporting interval is " + String(reporting_interval) + " seconds"));
+  request->send(200, "text/plain", String(reporting_interval));
 }
 
 static void handle_NotFound(AsyncWebServerRequest *request) {
@@ -224,6 +224,16 @@ void initWebServer() {
       ans += String(time_in_minutes);
     }
     request->send(200, "text/plain", ans);
+  });
+
+  server.on("/version", HTTP_GET, [](AsyncWebServerRequest *request) {
+    request->send(200, "text/plain", FIRMWARE_VERSION);
+  });
+
+  server.on("/update", HTTP_GET, [](AsyncWebServerRequest *request) {
+    if (!request->authenticate(http_username, http_password))
+      return request->requestAuthentication();
+    request->send(LittleFS, "/update.html", "text/html");
   });
 
   server.onNotFound(handle_NotFound);

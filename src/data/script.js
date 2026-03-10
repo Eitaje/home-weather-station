@@ -439,6 +439,17 @@ window.addEventListener('load', function() {
     };
     xhr.open('GET', '/get_reporting_interval', true);
     xhr.send();
+
+    // Fetch firmware version and display in header
+    var vxhr = new XMLHttpRequest();
+    vxhr.onreadystatechange = function() {
+        if (this.readyState === 4 && this.status === 200) {
+            var el = document.getElementById('versionLabel');
+            if (el) el.textContent = 'v' + this.responseText.trim();
+        }
+    };
+    vxhr.open('GET', '/version', true);
+    vxhr.send();
 });
 
 // ── SSE ───────────────────────────────────────────────────────────────────────

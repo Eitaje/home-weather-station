@@ -60,4 +60,4 @@ The sketch runs a WiFi-connected weather station web server. Sensor sampling, NT
 
 ### Network
 
-Static IP: `192.168.3.44`, gateway `192.168.3.1`. Credentials in `pwd.h`. NTP: `pool.ntp.org` at GMT+2.
+Static IP and gateway defined via `DEVICE_IP` / `GATEWAY_IP` / `SUBNET_MASK` macros in `pwd.h` (gitignored). See `pwd.h.example` for format. NTP: `pool.ntp.org` at GMT+2.
