@@ -14,6 +14,8 @@
 extern Task task_sample_water_temp;
 extern Task task_sample_BH1750;
 extern Task task_sample_ENS160;
+extern Task task_update_date_time;
+extern Task task_send_new_readings_event;
 
 // Globals defined in the main .ino
 extern int          reporting_interval;
@@ -137,9 +139,12 @@ static void handle_write_param(AsyncWebServerRequest *request) {
     if (dht_sampe_interval <= 0)              dht_sampe_interval = 1000;
     else if (dht_sampe_interval > 86400000)   dht_sampe_interval = 86400000;
 
+    reporting_interval = dht_sampe_interval;
     task_sample_ENS160.setInterval(dht_sampe_interval);
     task_sample_BH1750.setInterval(dht_sampe_interval);
     task_sample_water_temp.setInterval(dht_sampe_interval);
+    task_update_date_time.setInterval(dht_sampe_interval);
+    task_send_new_readings_event.setInterval(dht_sampe_interval);
 
     int index = 0;
     for (int x = dht_sample_interval_str.length() - 1; x >= 0; x--)
@@ -191,8 +196,6 @@ void initWebServer() {
   });
 
   server.on("/set_reporting_interval", HTTP_GET, [](AsyncWebServerRequest *request) {
-    if (!request->authenticate(http_username, http_password))
-      return request->requestAuthentication();
     handle_write_param(request);
   });
 
