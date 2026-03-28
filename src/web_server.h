@@ -10,3 +10,4 @@ extern unsigned long boiler_turned_on_timestamp;
 void initWebServer();
 void send_new_readings_event_callback();
 void readSamplingFreqParamer();
+void readSensorEnabledParam();

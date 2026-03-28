@@ -13,6 +13,7 @@
 // Task objects defined in the main .ino
 extern Task task_sample_water_temp;
 extern Task task_sample_BH1750;
+extern Task task_sample_BMP580;
 extern Task task_sample_ENS160;
 extern Task task_update_date_time;
 extern Task task_send_new_readings_event;
@@ -22,9 +23,15 @@ extern int          reporting_interval;
 extern const char*  http_username;
 extern const char*  http_password;
 
+// Sensor enable mask (defined in sensors.cpp)
+extern uint8_t sensor_enabled_mask;
+
 // ── Server objects ────────────────────────────────────────────────────────────
 AsyncWebServer  server(80);
 AsyncEventSource events("/events");
+
+// ── LittleFS file upload (used for OTA UI updates via curl) ──────────────────
+static File uploadFile;
 
 // ── Boiler state ──────────────────────────────────────────────────────────────
 boolean       boiler_state              = true;
@@ -46,6 +53,14 @@ static void readOtaDelayParam() {
     index++;
   }
   if (new_delay >= 5) ota_reboot_delay = new_delay;
+}
+
+void readSensorEnabledParam() {
+  uint8_t val = EEPROM.read(sensor_enable_address);
+  // 0xFF = uninitialised flash; 0x00 = all off (invalid) — default to all enabled
+  if (val == 0xFF || val == 0x00) val = SENSOR_ALL_ENABLED;
+  sensor_enabled_mask = val;
+  Serial.print("Sensor enabled mask: 0x"); Serial.println(val, HEX);
 }
 
 void readSamplingFreqParamer() {
@@ -99,9 +114,18 @@ static void handle_hello(AsyncWebServerRequest *request) {
 
 static void handle_get_all_samples(AsyncWebServerRequest *request) {
   char buffer[40];
-  String ptr = "time, external temp, humidity, water temp, light intensity, AQI, VOC, CO2\n";
-  if (!temperature_buffer.isEmpty()) {
-    for (int i = 0; i < temperature_buffer.size(); i++) {
+  // Drive row count from current_time_buffer (populated by NTP, independent of sensor mask).
+  // Fall back to any non-empty sensor buffer in case NTP hasn't resolved yet.
+  int n = (int)current_time_buffer.size();
+  if (n == 0) n = (int)temperature_buffer.size();
+  if (n == 0) n = (int)pressure_buffer.size();
+  if (n == 0) n = (int)lightIntensity_buffer.size();
+  if (n == 0) n = (int)water_temp_buffer.size();
+  if (n == 0) n = (int)CO2_buffer.size();
+
+  String ptr = "time, external temp, humidity, water temp, light intensity, AQI, VOC, CO2, pressure, temperature_bmp580\n";
+  if (n > 0) {
+    for (int i = 0; i < n; i++) {
       if (i < (int)current_time_buffer.size()) {
         sprintf(buffer, "%lu", current_time_buffer[i]);
         ptr += buffer;
@@ -109,24 +133,62 @@ static void handle_get_all_samples(AsyncWebServerRequest *request) {
         ptr += "0";
       }
       ptr += ",";
-      ptr += temperature_buffer[i];
+      ptr += (i < (int)temperature_buffer.size())    ? String(temperature_buffer[i])    : "0";
       ptr += ",";
-      ptr += humidity_buffer[i];
+      ptr += (i < (int)humidity_buffer.size())       ? String(humidity_buffer[i])       : "0";
       ptr += ",";
-      ptr += water_temp_buffer[i];
+      ptr += (i < (int)water_temp_buffer.size())     ? String(water_temp_buffer[i])     : "0";
       ptr += ",";
-      ptr += lightIntensity_buffer[i];
+      ptr += (i < (int)lightIntensity_buffer.size()) ? String(lightIntensity_buffer[i]) : "0";
       ptr += ",";
-      ptr += (i < (int)AQI_buffer.size()) ? String(AQI_buffer[i]) : "0";
+      ptr += (i < (int)AQI_buffer.size())            ? String(AQI_buffer[i])            : "0";
       ptr += ",";
-      ptr += (i < (int)VOC_buffer.size()) ? String(VOC_buffer[i]) : "0";
+      ptr += (i < (int)VOC_buffer.size())            ? String(VOC_buffer[i])            : "0";
       ptr += ",";
-      ptr += (i < (int)CO2_buffer.size()) ? String(CO2_buffer[i]) : "0";
+      ptr += (i < (int)CO2_buffer.size())            ? String(CO2_buffer[i])            : "0";
+      ptr += ",";
+      ptr += (i < (int)pressure_buffer.size())       ? String(pressure_buffer[i])       : "0";
+      ptr += ",";
+      ptr += (i < (int)bmp580_temp_buffer.size())    ? String(bmp580_temp_buffer[i])    : "0";
       ptr += "\n";
     }
     request->send(200, "text/plain", ptr);
   } else {
     request->send(200, "text/plain", "No samples yet\n");
+  }
+}
+
+static void handle_get_hourly_samples(AsyncWebServerRequest *request) {
+  char buf[20];
+  String ptr = "time, external temp, humidity, water temp, light intensity, AQI, VOC, CO2, pressure, temperature_bmp580\n";
+  if (!hourly_time_buffer.isEmpty()) {
+    int n = (int)hourly_time_buffer.size();
+    for (int i = 0; i < n; i++) {
+      sprintf(buf, "%lu", hourly_time_buffer[i]);
+      ptr += buf;
+      ptr += ",";
+      ptr += (i < (int)hourly_temperature_buffer.size()) ? String(hourly_temperature_buffer[i]) : "0";
+      ptr += ",";
+      ptr += (i < (int)hourly_humidity_buffer.size())    ? String(hourly_humidity_buffer[i])    : "0";
+      ptr += ",";
+      ptr += (i < (int)hourly_water_temp_buffer.size())  ? String(hourly_water_temp_buffer[i])  : "0";
+      ptr += ",";
+      ptr += (i < (int)hourly_light_buffer.size())       ? String(hourly_light_buffer[i])       : "0";
+      ptr += ",";
+      ptr += (i < (int)hourly_AQI_buffer.size())         ? String(hourly_AQI_buffer[i])         : "0";
+      ptr += ",";
+      ptr += (i < (int)hourly_VOC_buffer.size())         ? String(hourly_VOC_buffer[i])         : "0";
+      ptr += ",";
+      ptr += (i < (int)hourly_CO2_buffer.size())         ? String(hourly_CO2_buffer[i])         : "0";
+      ptr += ",";
+      ptr += (i < (int)hourly_pressure_buffer.size())    ? String(hourly_pressure_buffer[i])    : "0";
+      ptr += ",";
+      ptr += (i < (int)hourly_bmp580_temp_buffer.size()) ? String(hourly_bmp580_temp_buffer[i]) : "0";
+      ptr += "\n";
+    }
+    request->send(200, "text/plain", ptr);
+  } else {
+    request->send(200, "text/plain", "No hourly data yet\n");
   }
 }
 
@@ -142,6 +204,7 @@ static void handle_write_param(AsyncWebServerRequest *request) {
     reporting_interval = dht_sampe_interval;
     task_sample_ENS160.setInterval(dht_sampe_interval);
     task_sample_BH1750.setInterval(dht_sampe_interval);
+    task_sample_BMP580.setInterval(dht_sampe_interval);
     task_sample_water_temp.setInterval(dht_sampe_interval);
     task_update_date_time.setInterval(dht_sampe_interval);
     task_send_new_readings_event.setInterval(dht_sampe_interval);
@@ -176,6 +239,7 @@ static void handle_NotFound(AsyncWebServerRequest *request) {
 // ── Server init ───────────────────────────────────────────────────────────────
 void initWebServer() {
   readOtaDelayParam();
+  // sensor_enabled_mask is read in setup() before initSensors(); no re-read needed here
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
     if (LittleFS.exists("/index.html"))
       request->send(LittleFS, "/index.html", "text/html");
@@ -205,6 +269,10 @@ void initWebServer() {
 
   server.on("/all_samples", HTTP_GET, [](AsyncWebServerRequest *request) {
     handle_get_all_samples(request);
+  });
+
+  server.on("/hourly_samples", HTTP_GET, [](AsyncWebServerRequest *request) {
+    handle_get_hourly_samples(request);
   });
 
   server.serveStatic("/", LittleFS, "/");
@@ -279,6 +347,55 @@ void initWebServer() {
     if (!request->authenticate(http_username, http_password))
       return request->requestAuthentication();
     request->send(LittleFS, "/update.html", "text/html");
+  });
+
+  server.on("/upload", HTTP_POST,
+    [](AsyncWebServerRequest *request) {
+      if (!request->authenticate(http_username, http_password))
+        return request->requestAuthentication();
+      request->send(200, "text/plain", "OK");
+    },
+    [](AsyncWebServerRequest *request, const String& filename, size_t index,
+       uint8_t *data, size_t len, bool final) {
+      if (!index) {
+        String path = filename.startsWith("/") ? filename : "/" + filename;
+        Serial.println("Upload start: " + path);
+        uploadFile = LittleFS.open(path, "w");
+      }
+      if (uploadFile) uploadFile.write(data, len);
+      if (final && uploadFile) {
+        uploadFile.close();
+        Serial.println("Upload done: " + filename);
+      }
+    }
+  );
+
+  server.on("/sensor_status", HTTP_GET, [](AsyncWebServerRequest *request) {
+    request->send(200, "application/json", getSensorStatus());
+  });
+
+  server.on("/get_sensor_enabled", HTTP_GET, [](AsyncWebServerRequest *request) {
+    request->send(200, "text/plain", String(sensor_enabled_mask));
+  });
+
+  server.on("/set_sensor_enabled", HTTP_GET, [](AsyncWebServerRequest *request) {
+    if (request->hasParam("mask")) {
+      int val = request->getParam("mask")->value().toInt();
+      if (val < 1)    val = 1;    // prevent all-sensors-off
+      if (val > 0x1F) val = 0x1F;
+      sensor_enabled_mask = (uint8_t)val;
+      EEPROM.write(sensor_enable_address, sensor_enabled_mask);
+      EEPROM.commit();
+      request->send(200, "text/plain", String(sensor_enabled_mask));
+    } else {
+      request->send(400, "text/plain", "mask parameter missing");
+    }
+  });
+
+  server.on("/reset", HTTP_GET, [](AsyncWebServerRequest *request) {
+    request->send(200, "text/plain", "Resetting...");
+    delay(200);
+    ESP.restart();
   });
 
   server.onNotFound(handle_NotFound);

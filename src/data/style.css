@@ -46,7 +46,9 @@ body {
   top: 0;
   z-index: 100;
 }
-
+.card-unit {
+  margin-left: 4px;
+}
 .header-left { display: flex; flex-direction: column; gap: 2px; }
 
 .logo {
@@ -110,7 +112,7 @@ body {
 }
 
 .section-label {
-  font-size: 0.65rem;
+  font-size: 1rem;
   font-weight: 600;
   letter-spacing: 0.2em;
   color: var(--text-dim);
@@ -294,6 +296,20 @@ input:checked + .toggle-track:before {
 
 .gauge-card canvas { max-width: 100%; }
 
+.gauge-card.sensor-inactive {
+  opacity: 0.35;
+  filter: grayscale(1);
+  pointer-events: none;
+  transition: opacity 0.4s, filter 0.4s;
+}
+.gauge-card.sensor-inactive .card-head::after {
+  content: attr(data-inactive-msg);
+  display: block;
+  font-size: 0.7rem;
+  color: #94a3b8;
+  margin-top: 2px;
+}
+
 /* ── Tab navigation ── */
 .tab-nav {
   display: flex;
@@ -356,10 +372,62 @@ input:checked + .toggle-track:before {
 
 .chart-card canvas { width: 100% !important; height: 220px !important; }
 
+/* ── Sensor status dot ── */
+.sensor-sts {
+  display: inline-block;
+  font-size: 1.4rem;
+  vertical-align: middle;
+  margin-right: 4px;
+  color: #94a3b8; /* default: checking */
+  cursor: default;
+  transition: color 0.3s;
+}
+.sensor-sts.ok       { color: #059669; }
+.sensor-sts.fault    { color: #dc2626; }
+.sensor-sts.disabled { color: #cbd5e1; }
+
 /* ── Responsive ── */
 @media (max-width: 600px) {
   .header { padding: 12px 16px; }
   .dashboard { padding: 20px 12px 40px; }
   .header-clock { display: none; }
   .boiler-card { padding: 16px 18px; }
+}
+
+/* ── Reset countdown modal ── */
+#reset-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.55);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+.reset-modal-box {
+  background: var(--bg-card);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 36px 48px;
+  text-align: center;
+  min-width: 220px;
+}
+.reset-modal-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 16px;
+}
+.reset-modal-count {
+  font-family: var(--font-mono);
+  font-size: 3.5rem;
+  font-weight: 700;
+  color: #dc2626;
+  line-height: 1;
+  margin-bottom: 12px;
+}
+.reset-modal-sub {
+  font-size: 0.78rem;
+  color: var(--text-muted);
 }

@@ -9,6 +9,7 @@ An ESP8266 NodeMCU v2-based WiFi weather station and boiler controller, serving 
 | AHT21 | I2C | Ambient temperature, humidity |
 | ENS160 | I2C | eCO2 (ppm), TVOC (ppb), Air Quality Index (1–5) |
 | BH1750 | I2C | Light intensity (lux) |
+| BMP580 | I2C | Barometric pressure, temperature |
 | DS18B20 | D4 (OneWire) | Water/tank temperature |
 | SSR (solid-state relay) | D5 | Boiler on/off control |
 
@@ -52,7 +53,31 @@ A custom OTA page is served at `/update` (auth required).
 4. The page computes the file MD5 automatically, then shows upload progress
 5. After upload completes, a countdown runs and the browser redirects to `/`
 
-> For LittleFS (web UI files) there is no browser OTA equivalent — use `pio run -t uploadfs` over serial.
+### Upload method 3 — curl OTA for LittleFS web UI files (no cable required)
+
+The `/upload` endpoint accepts individual files via `multipart/form-data` POST.
+Upload each file you changed from `src/data/`:
+
+**PowerShell (Windows)** — use `curl.exe` explicitly (`curl` alone is an alias for `Invoke-WebRequest`):
+
+```powershell
+curl.exe -u "WaterUser:<password>" -F "file=@src/data/index.html;filename=/index.html" http://<DEVICE_IP>/upload
+curl.exe -u "WaterUser:<password>" -F "file=@src/data/script.js;filename=/script.js"   http://<DEVICE_IP>/upload
+curl.exe -u "WaterUser:<password>" -F "file=@src/data/style.css;filename=/style.css"   http://<DEVICE_IP>/upload
+```
+
+**bash / Git Bash / WSL:**
+
+```bash
+for f in src/data/index.html src/data/script.js src/data/style.css src/data/favicon.png; do
+  curl -u WaterUser:'<password>' \
+       -F "file=@$f;filename=/$(basename $f)" \
+       http://<DEVICE_IP>/upload \
+  && echo "  → uploaded $f"
+done
+```
+
+> No device reset is needed after a file upload; the next page load serves the new file.
 
 ### Version
 
@@ -60,7 +85,7 @@ The firmware version is defined in `platformio.ini`:
 
 ```ini
 build_flags =
-    -D FIRMWARE_VERSION='"1.05"'
+    -D FIRMWARE_VERSION='"1.07"'
     -D OTA_REBOOT_DELAY=5
 ```
 
@@ -76,13 +101,18 @@ build_flags =
 | `/curr_readings` | JSON snapshot of current sensor values + `timestamp` |
 | `/events` | SSE stream — pushes `new_readings` JSON on each sample |
 | `/all_samples` | CSV of all buffered readings (last 50 per sensor) |
+| `/hourly_samples` | CSV of hourly-averaged readings (last 48 hours) |
 | `/button_state` | Boiler relay state + time on (plain text) |
 | `/button_update?state=1\|0` | Toggle boiler relay |
 | `/set_reporting_interval?sample_interval=N` | Set sampling interval in ms (persisted to EEPROM) |
 | `/get_reporting_interval` | Read current sampling interval in ms |
 | `/ota_delay` | Read current OTA reboot delay in seconds |
 | `/set_ota_delay?delay=N` | Set OTA reboot delay in seconds, 5–300 (auth required, persisted to EEPROM) |
+| `/get_sensor_enabled` | Read sensor enable bitmask (plain text integer) |
+| `/set_sensor_enabled?mask=N` | Set sensor enable bitmask (persisted to EEPROM; reset required) |
+| `/upload` | Upload a file to LittleFS via multipart POST (auth required) |
 | `/update` | OTA firmware update page (auth required) |
+| `/reset` | Trigger a software reset |
 | `/version` | Firmware version string (plain text) |
 
 ## Web UI
@@ -91,7 +121,7 @@ Three-tab dashboard served from LittleFS (`src/data/`):
 
 - **Live** — real-time sensor gauges (temperature, humidity, light, CO₂, VOC, AQI) and boiler toggle
 - **History** — Chart.js line charts for all sensors with optional moving-average overlay
-- **Config** — sampling rate selector and OTA reboot delay setting
+- **Config** — per-sensor enable/disable toggles (persisted, reset required), sampling rate selector, and OTA reboot delay setting
 
 Static files:
 - `index.html` — dashboard layout and tab structure
@@ -125,3 +155,4 @@ src/
 - `getSensorReadings()` returns a JSON string with the latest values, keyed as: `temperature`, `humidity`, `water_temperature`, `light`, `CO2`, `VOC`, `AQI`, `timestamp`
 - Sampling interval is persisted to EEPROM (address 0) and restored on boot; changing it via the UI updates all sensor tasks and the SSE push task immediately
 - OTA reboot delay is persisted to EEPROM (address 10) and restored on boot; default comes from the `OTA_REBOOT_DELAY` build flag
+- Sensor enable bitmask is persisted to EEPROM (address 20); bits 0–4 map to AHT21, ENS160, BH1750, BMP580, DS18B20; changes take effect on next boot

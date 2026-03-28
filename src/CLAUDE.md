@@ -52,11 +52,12 @@ The sketch runs a WiFi-connected weather station web server. Sensor sampling, NT
 | AHT21 | I2C | `temperature`, `humidity` |
 | ENS160 | I2C | `eco2`, `tvoc`, `aqi` + `CO2_buffer`, `VOC_buffer`, `AQI_buffer` |
 | BH1750 | I2C | `light_intensity`, `lightIntensity_buffer` |
+| BMP580 | I2C | `bmp580_pressure`, `pressure_buffer` |
 | DS18B20 | D4 (OneWire) | `water_temperature`, `water_temp_buffer` |
 
 ### JSON keys from `getSensorReadings()`
 
-`temperature`, `humidity`, `water_temperature`, `light`, `CO2`, `VOC`, `AQI`
+`temperature`, `humidity`, `water_temperature`, `light`, `CO2`, `VOC`, `AQI`, `pressure`
 
 ### Network
 

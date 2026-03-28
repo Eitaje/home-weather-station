@@ -53,38 +53,50 @@
         </div>
       </div>
 
-      <div class="section-label">Climate</div>
+      <div class="section-label">Temperature</div>
       <div class="gauge-grid">
         <div class="card gauge-card">
-          <div class="card-head"><span class="card-name">Tank Temperature</span><span class="card-unit">°C</span></div>
+          <div class="card-head"><span class="card-name">Water-Tank Temperature</span><span class="card-unit">(°C)</span></div>
           <canvas id="gauge-water-temperature"></canvas>
         </div>
         <div class="card gauge-card">
-          <div class="card-head"><span class="card-name">Ambient Temperature</span><span class="card-unit">°C</span></div>
+          <div class="card-head"><span class="card-name">Outside Temperature (ESN160)</span><span class="card-unit">(°C)</span></div>
           <canvas id="gauge-temperature"></canvas>
         </div>
         <div class="card gauge-card">
-          <div class="card-head"><span class="card-name">Humidity</span><span class="card-unit">%</span></div>
+          <div class="card-head"><span class="card-name">Outside Temperature (BMP580)</span><span class="card-unit">(°C)</span></div>
+          <canvas id="gauge-bmp580-temp"></canvas>
+        </div>
+      </div>
+
+      <div class="section-label">Climate</div>
+      <div class="gauge-grid">
+        <div class="card gauge-card">
+          <div class="card-head"><span class="card-name">Humidity</span> <span class="card-unit">(%)</span></div>
           <canvas id="gauge-humidity"></canvas>
         </div>
         <div class="card gauge-card">
-          <div class="card-head"><span class="card-name">Light Intensity</span><span class="card-unit">lux</span></div>
+          <div class="card-head"><span class="card-name">Light Intensity</span> <span class="card-unit">(lux)</span></div>
           <canvas id="gauge-light"></canvas>
+        </div>
+        <div class="card gauge-card">
+          <div class="card-head"><span class="card-name">Pressure</span> <span class="card-unit">(hPa)</span></div>
+          <canvas id="gauge-pressure"></canvas>
         </div>
       </div>
 
       <div class="section-label">Air Quality — ENS160</div>
       <div class="gauge-grid">
         <div class="card gauge-card">
-          <div class="card-head"><span class="card-name">CO2</span><span class="card-unit">ppm</span></div>
+          <div class="card-head"><span class="card-name">CO2</span><span class="card-unit">(ppm)</span></div>
           <canvas id="gauge-co2"></canvas>
         </div>
         <div class="card gauge-card">
-          <div class="card-head"><span class="card-name">VOC</span><span class="card-unit">ppb</span></div>
+          <div class="card-head"><span class="card-name">VOC</span><span class="card-unit">(ppb)</span></div>
           <canvas id="gauge-voc"></canvas>
         </div>
         <div class="card gauge-card">
-          <div class="card-head"><span class="card-name">Air Quality Index</span><span class="card-unit">1 – 5</span></div>
+          <div class="card-head"><span class="card-name">Air Quality Index</span><span class="card-unit">(1 – 5)</span></div>
           <canvas id="gauge-aqi"></canvas>
         </div>
       </div>
@@ -95,37 +107,50 @@
     <div id="tab-history" style="display:none">
 
       <div class="section-label" style="display:flex;justify-content:space-between;align-items:center">
-        <span>Sample History</span>
-        <div style="display:flex;gap:8px">
+        <span id="historyTabTitle">Sample History</span>
+        <div style="display:flex;gap:8px;align-items:center">
           <button class="refresh-btn" onclick="loadCharts()">↻ Refresh</button>
           <button class="refresh-btn active" id="maToggleBtn" onclick="toggleMA()">◎ Moving Avg</button>
+          <label class="toggle" title="Switch to hourly aggregations">
+            <input type="checkbox" id="hourlyToggle" onchange="switchHistoryMode()">
+            <span class="toggle-track"></span>
+          </label>
+          <span style="font-size:0.78rem;color:var(--text-muted)">Hourly</span>
         </div>
       </div>
 
       <div class="chart-grid">
         <div class="card chart-card">
-          <div class="card-head"><span class="card-name">Temperature</span><span class="card-unit">°C</span></div>
-          <canvas id="chart-temp"></canvas>
+          <div class="card-head"><span class="card-name">Water-Tank Temperature</span><span class="card-unit">(°C)</span></div>
+          <canvas id="chart-water-temp"></canvas>
         </div>
         <div class="card chart-card">
-          <div class="card-head"><span class="card-name">Humidity</span><span class="card-unit">%</span></div>
+          <div class="card-head"><span class="card-name">Outside Temperature</span><span class="card-unit">(°C)</span></div>
+          <canvas id="chart-outside-temp"></canvas>
+        </div>
+        <div class="card chart-card">
+          <div class="card-head"><span class="card-name">Humidity</span><span class="card-unit">(%)</span></div>
           <canvas id="chart-hum"></canvas>
         </div>
         <div class="card chart-card">
-          <div class="card-head"><span class="card-name">Light Intensity</span><span class="card-unit">lux</span></div>
+          <div class="card-head"><span class="card-name">Light Intensity</span><span class="card-unit">(lux)</span></div>
           <canvas id="chart-light"></canvas>
         </div>
         <div class="card chart-card">
-          <div class="card-head"><span class="card-name">CO2</span><span class="card-unit">ppm</span></div>
+          <div class="card-head"><span class="card-name">CO2</span><span class="card-unit">(ppm)</span></div>
           <canvas id="chart-co2"></canvas>
         </div>
         <div class="card chart-card">
-          <div class="card-head"><span class="card-name">VOC</span><span class="card-unit">ppb</span></div>
+          <div class="card-head"><span class="card-name">VOC</span><span class="card-unit">(ppb)</span></div>
           <canvas id="chart-voc"></canvas>
         </div>
         <div class="card chart-card">
-          <div class="card-head"><span class="card-name">Air Quality Index</span><span class="card-unit">1 – 5</span></div>
+          <div class="card-head"><span class="card-name">Air Quality Index</span><span class="card-unit">(1 – 5)</span></div>
           <canvas id="chart-aqi"></canvas>
+        </div>
+        <div class="card chart-card">
+          <div class="card-head"><span class="card-name">Pressure</span><span class="card-unit">(hPa)</span></div>
+          <canvas id="chart-pressure"></canvas>
         </div>
       </div>
 
@@ -133,6 +158,38 @@
 
     <!-- ── TAB 3: Config ── -->
     <div id="tab-config" style="display:none">
+
+      <div class="section-label">Sensors</div>
+      <div class="card interval-card">
+        <span class="interval-label">Enable / disable sensors (reset required)</span>
+        <div style="display:flex;flex-direction:column;gap:10px;margin-top:10px">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <span style="font-size:0.85rem"><span id="sts-aht21" class="sensor-sts" title="checking...">●</span> AHT21 &mdash; Temperature &amp; Humidity</span>
+            <label class="toggle"><input type="checkbox" id="sen-aht21" onchange="saveSensorMask()"><span class="toggle-track"></span></label>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <span style="font-size:0.85rem"><span id="sts-ens160" class="sensor-sts" title="checking...">●</span> ENS160 &mdash; AQI / VOC / CO₂</span>
+            <label class="toggle"><input type="checkbox" id="sen-ens160" onchange="saveSensorMask()"><span class="toggle-track"></span></label>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <span style="font-size:0.85rem"><span id="sts-bh1750" class="sensor-sts" title="checking...">●</span> BH1750 &mdash; Light</span>
+            <label class="toggle"><input type="checkbox" id="sen-bh1750" onchange="saveSensorMask()"><span class="toggle-track"></span></label>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <span style="font-size:0.85rem"><span id="sts-bmp580" class="sensor-sts" title="checking...">●</span> BMP580 &mdash; Pressure &amp; Temperature</span>
+            <label class="toggle"><input type="checkbox" id="sen-bmp580" onchange="saveSensorMask()"><span class="toggle-track"></span></label>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <span style="font-size:0.85rem"><span id="sts-ds18b20" class="sensor-sts" title="checking...">●</span> DS18B20 &mdash; Water Temperature</span>
+            <label class="toggle"><input type="checkbox" id="sen-ds18b20" onchange="saveSensorMask()"><span class="toggle-track"></span></label>
+          </div>
+        </div>
+        <div id="sensor-reset-warning" style="display:none;margin-top:12px;padding:8px 12px;
+             background:#fef3c7;border:1px solid #f59e0b;border-radius:6px;
+             font-size:0.8rem;color:#92400e">
+          ⚠ Reset the device for sensor changes to take effect.
+        </div>
+      </div>
 
       <div class="section-label">Sampling Rate</div>
       <div class="card interval-card">
@@ -160,9 +217,33 @@
         </div>
       </div>
 
+
+      <div class="section-label">Device</div>
+      <div class="card interval-card">
+        <span class="interval-label">Firmware update (OTA)</span>
+        <div class="interval-bar">
+          <button class="interval-btn" onclick="window.location.href='/update'">↑ Update</button>
+        </div>
+      </div>
+      <div class="card interval-card">
+        <span class="interval-label">Restart the device</span>
+        <div class="interval-bar">
+          <button class="interval-btn" style="background:#fee2e2;color:#b91c1c;border-color:#fca5a5" onclick="resetDevice()">⟳ Reset</button>
+        </div>
+      </div>
+
     </div><!-- /tab-config -->
 
   </main>
+
+  <!-- ── Reset countdown modal ── -->
+  <div id="reset-modal" style="display:none">
+    <div class="reset-modal-box">
+      <div class="reset-modal-title">Restarting device…</div>
+      <div class="reset-modal-count" id="reset-countdown">5</div>
+      <div class="reset-modal-sub">Redirecting when ready</div>
+    </div>
+  </div>
 
   <script src="script.js"></script>
 </body>

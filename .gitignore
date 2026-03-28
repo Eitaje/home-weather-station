@@ -10,6 +10,9 @@
 # Credentials - never commit
 src/pwd.h
 
+# Local overrides (device IP, personal OTA env) - not for git
+platformio.local.ini
+
 # Arduino IDE build artifacts
 src/build/
 src/*.bin

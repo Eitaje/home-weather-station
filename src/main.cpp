@@ -5,7 +5,6 @@
 #include <AsyncElegantOTA.h>
 #include <CircularBuffer.h>
 #include <EEPROM.h>
-#include "DHT.h"
 #include <Wire.h>
 #include <BH1750.h>
 #include <OneWire.h>
@@ -15,9 +14,6 @@
 #include <WiFiUdp.h>
 #include "LittleFS.h"
 #include <Arduino_JSON.h>
-#include <Adafruit_Sensor.h>
-#include "Adafruit_BMP3XX.h"
-
 #include "config.h"
 #include "sensors.h"
 #include "wifi_manager.h"
@@ -40,9 +36,11 @@ Task task_initiator              (1000,               TASK_ONCE,    task_initiat
 Task task_sample_ENS160          (DEFAULT_SAMPLE_RATE, TASK_FOREVER, &sample_sensor_ENS160_callback);
 Task task_sample_water_temp      (DEFAULT_SAMPLE_RATE, TASK_FOREVER, &sample_sensor_water_temp_callback);
 Task task_sample_BH1750          (DEFAULT_SAMPLE_RATE, TASK_FOREVER, &sample_sensor_BH1750_callback);
+Task task_sample_BMP580          (DEFAULT_SAMPLE_RATE, TASK_FOREVER, &sample_sensor_BMP580_callback);
 Task task_update_date_time       (DEFAULT_SAMPLE_RATE, TASK_FOREVER, &update_date_time_callback);
 Task task_send_new_readings_event(DEFAULT_SAMPLE_RATE, TASK_FOREVER, &send_new_readings_event_callback);
 Task task_check_wifi_connected   (1000,               TASK_FOREVER, &task_check_wifi_connected_callback);
+Task task_hourly_aggregation     (3600000UL,           TASK_FOREVER, &aggregate_hourly_callback);
 
 // ── LittleFS init ─────────────────────────────────────────────────────
 static void initFS() {
@@ -60,28 +58,48 @@ void task_initiator_callback() {
   task_sample_ENS160.setInterval(reporting_interval);
   task_sample_water_temp.setInterval(reporting_interval);
   task_sample_BH1750.setInterval(reporting_interval);
+  task_sample_BMP580.setInterval(reporting_interval);
   task_update_date_time.setInterval(reporting_interval);
   task_send_new_readings_event.setInterval(reporting_interval);
 
   task_sample_ENS160.enable();
   task_sample_water_temp.enableDelayed(1000);
   task_sample_BH1750.enableDelayed(2000);
+  task_sample_BMP580.enableDelayed(3000);
   task_update_date_time.enableDelayed(4000);
   task_send_new_readings_event.enable();
   task_check_wifi_connected.enable();
+  task_hourly_aggregation.enable();
   digitalWrite(SSRPin, HIGH);
 }
 
 // ── Setup ─────────────────────────────────────────────────────────────────────
 void setup() {
-  Wire.begin();
   Serial.begin(115200);
+
+  // I2C bus recovery: if the ESP reset mid-transaction a slave may be holding
+  // SDA low.  Toggling SCL up to 9 times gives the slave the clocks it needs
+  // to finish and release the bus.  Uses open-drain signaling (INPUT_PULLUP =
+  // release/high, OUTPUT LOW = drive low) — push-pull OUTPUT on SCL/SDA causes
+  // a glitch when Wire.begin() later reconfigures the pins, disrupting I2C.
+  pinMode(D1, INPUT_PULLUP); // SCL
+  pinMode(D2, INPUT_PULLUP); // SDA
+  for (int i = 0; i < 9; i++) {
+    pinMode(D1, OUTPUT); digitalWrite(D1, LOW); delayMicroseconds(10);
+    pinMode(D1, INPUT_PULLUP);                  delayMicroseconds(10);
+  }
+  // STOP condition: SCL high, then SDA high
+  pinMode(D1, INPUT_PULLUP); delayMicroseconds(10);
+  pinMode(D2, INPUT_PULLUP); delayMicroseconds(10);
+  Wire.begin();
+  delay(100);
   pinMode(D0,     OUTPUT);
   pinMode(SSRPin, OUTPUT);
   pinMode(DHTPin, INPUT);
 
   EEPROM.begin(128);
   initFS();
+  readSensorEnabledParam();
   initSensors();
 
   runner.init();
@@ -89,9 +107,11 @@ void setup() {
   runner.addTask(task_sample_ENS160);
   runner.addTask(task_sample_water_temp);
   runner.addTask(task_sample_BH1750);
+  runner.addTask(task_sample_BMP580);
   runner.addTask(task_update_date_time);
   runner.addTask(task_send_new_readings_event);
   runner.addTask(task_check_wifi_connected);
+  runner.addTask(task_hourly_aggregation);
 
   initWiFi();
   task_initiator.enable();

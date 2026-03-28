@@ -192,6 +192,29 @@ var gaugeAQI = new RadialGauge(Object.assign({}, darkRadial, {
     ],
 })).draw();
 
+var gaugeBmp580Temp = new LinearGauge(Object.assign({}, darkLinear, {
+    renderTo: 'gauge-bmp580-temp',
+    minValue: 0, maxValue: 50,
+    valueDec: 1, valueInt: 2,
+    majorTicks: ['0','10','20','30','40','50'],
+    minorTicks: 4,
+    highlights: [{ from: 33, to: 50, color: 'rgba(239,68,68,0.25)' }],
+})).draw();
+
+var gaugePressure = new RadialGauge(Object.assign({}, darkRadial, {
+    renderTo: 'gauge-pressure',
+    minValue: 900, maxValue: 1100,
+    valueDec: 1, valueInt: 4,
+    majorTicks: ['900','940','980','1020','1060','1100'],
+    minorTicks: 4,
+    strokeTicks: true,
+    highlights: [
+        { from: 900,  to: 960,  color: 'rgba(99,102,241,0.2)'  },
+        { from: 960,  to: 1040, color: 'rgba(16,185,129,0.15)' },
+        { from: 1040, to: 1100, color: 'rgba(245,158,11,0.2)'  },
+    ],
+})).draw();
+
 // ── Tab switching ─────────────────────────────────────────────────────────────
 function switchTab(name, btn) {
     document.getElementById('tab-live').style.display    = name === 'live'    ? '' : 'none';
@@ -293,22 +316,59 @@ function initChart(id, datasets) {
     charts[id] = new Chart(ctx, cfg);
 }
 
-// ── Load charts from /all_samples ────────────────────────────────────────────
+// ── History mode (recent samples vs hourly aggregations) ──────────────────────
+var hourlyMode = false;
+
+function switchHistoryMode() {
+    hourlyMode = document.getElementById('hourlyToggle').checked;
+    var title = document.getElementById('historyTabTitle');
+    if (title) title.textContent = hourlyMode ? 'Hourly Aggregations (48h)' : 'Sample History';
+    loadCharts();
+}
+
+// ── Load charts from /all_samples or /hourly_samples ─────────────────────────
 function loadCharts() {
+    var endpoint = hourlyMode ? '/hourly_samples' : '/all_samples';
     var xhr = new XMLHttpRequest();
     xhr.onreadystatechange = function() {
         if (this.readyState !== 4 || this.status !== 200) return;
 
         var lines = this.responseText.trim().split('\n');
-        if (lines.length < 2) return; // header only = no data
+        if (lines.length < 2) {
+            var msg = hourlyMode
+                ? 'No hourly data yet — first entry recorded after 1 h uptime'
+                : 'No samples yet — data will appear after the first reading';
+            var title = document.getElementById('historyTabTitle');
+            if (title) title.textContent = hourlyMode ? 'Hourly Aggregations (48h)' : 'Sample History';
+            // Show placeholder text inside each chart canvas
+            ['chart-water-temp','chart-outside-temp','chart-hum','chart-light',
+             'chart-co2','chart-voc','chart-aqi','chart-pressure'].forEach(function(id) {
+                var canvas = document.getElementById(id);
+                if (!canvas) return;
+                if (charts[id]) { charts[id].destroy(); delete charts[id]; }
+                var ctx = canvas.getContext('2d');
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.save();
+                ctx.font = '14px Inter, sans-serif';
+                ctx.fillStyle = '#94a3b8';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(msg, (canvas.width || canvas.offsetWidth || 200) / 2,
+                                 (canvas.height || canvas.offsetHeight || 80) / 2);
+                ctx.restore();
+            });
+            return;
+        }
 
-        var labels = [], temps = [], waterTemps = [], hums = [], lights = [];
-        var co2s = [], vocs = [], aqis = [];
+        var labels = [], timestamps = [];
+        var temps = [], waterTemps = [], hums = [], lights = [];
+        var co2s = [], vocs = [], aqis = [], pressures = [], bmp580Temps = [];
 
         for (var i = 1; i < lines.length; i++) {
             var p = lines[i].split(',');
             if (p.length < 8) continue;
-            labels.push(i);
+            var ts = parseInt(p[0]);
+            timestamps.push(ts);
             temps.push(parseFloat(p[1]));
             hums.push(parseFloat(p[2]));
             waterTemps.push(parseFloat(p[3]));
@@ -316,37 +376,29 @@ function loadCharts() {
             aqis.push(parseFloat(p[5]));
             vocs.push(parseFloat(p[6]));
             co2s.push(parseFloat(p[7]));
+            pressures.push(p.length > 8 ? parseFloat(p[8]) : null);
+            bmp580Temps.push(p.length > 9 ? parseFloat(p[9]) : null);
         }
 
-        // Temperature: dual y-axes (Ambient left, Water right)
-        (function() {
-            var ctx = document.getElementById('chart-temp').getContext('2d');
-            if (charts['chart-temp']) charts['chart-temp'].destroy();
-            var cfg = JSON.parse(JSON.stringify(chartDefaults));
-            cfg.data = {
-                labels: labels,
-                datasets: [
-                    Object.assign(makeDataset('Ambient', temps, 'rgb(8,145,178)'), { yAxisID: 'y' }),
-                    Object.assign(makeMADataset('Ambient MA', temps, 'rgb(8,145,178)'), { yAxisID: 'y' }),
-                    Object.assign(makeDataset('Water', waterTemps, 'rgb(5,150,105)'), { yAxisID: 'y1' }),
-                    Object.assign(makeMADataset('Water MA', waterTemps, 'rgb(5,150,105)'), { yAxisID: 'y1' }),
-                ]
-            };
-            cfg.options.plugins.legend.display = true;
-            cfg.options.scales.y1 = {
-                type: 'linear',
-                position: 'right',
-                ticks: { color: '#059669', font: { size: 10 } },
-                grid: { drawOnChartArea: false },
-            };
-            charts['chart-temp'] = new Chart(ctx, cfg);
-        })();
+        // Labels: time-formatted for hourly, index for recent samples
+        if (hourlyMode && timestamps.length > 0 && timestamps[0] > 0) {
+            labels = timestamps.map(function(t) {
+                if (!t) return '?';
+                var d = new Date(t * 1000);
+                return ('0' + d.getHours()).slice(-2) + ':00';
+            });
+        } else {
+            for (var j = 0; j < temps.length; j++) labels.push(j + 1);
+        }
 
-        // Simple charts with data + MA overlay
+        var xTitle = hourlyMode ? 'Hour' : 'Sample #';
+
+        // Simple line chart with data + MA overlay
         function simpleChart(id, label, data, color) {
             var ctx = document.getElementById(id).getContext('2d');
             if (charts[id]) charts[id].destroy();
             var cfg = JSON.parse(JSON.stringify(chartDefaults));
+            cfg.options.scales.x.title.text = xTitle;
             cfg.data = {
                 labels: labels,
                 datasets: [
@@ -357,13 +409,79 @@ function loadCharts() {
             charts[id] = new Chart(ctx, cfg);
         }
 
-        simpleChart('chart-hum',   'Humidity', hums,   'rgb(99,102,241)');
-        simpleChart('chart-light', 'Lux',      lights, 'rgb(245,158,11)');
-        simpleChart('chart-co2',   'CO₂',      co2s,   'rgb(239,68,68)');
-        simpleChart('chart-voc',   'VOC',      vocs,   'rgb(168,85,247)');
-        simpleChart('chart-aqi',   'AQI',      aqis,   'rgb(20,184,166)');
+        // Water-tank temperature
+        simpleChart('chart-water-temp', 'Water Tank', waterTemps, 'rgb(5,150,105)');
+
+        // Outside temperature: ENS160 + BMP580 on the same axis
+        (function() {
+            var ctx = document.getElementById('chart-outside-temp').getContext('2d');
+            if (charts['chart-outside-temp']) charts['chart-outside-temp'].destroy();
+            var cfg = JSON.parse(JSON.stringify(chartDefaults));
+            cfg.options.scales.x.title.text = xTitle;
+            cfg.data = {
+                labels: labels,
+                datasets: [
+                    makeDataset('ENS160', temps, 'rgb(8,145,178)'),
+                    makeMADataset('ENS160 MA', temps, 'rgb(8,145,178)'),
+                    makeDataset('BMP580', bmp580Temps, 'rgb(234,88,12)'),
+                    makeMADataset('BMP580 MA', bmp580Temps, 'rgb(234,88,12)'),
+                ]
+            };
+            cfg.options.plugins.legend.display = true;
+            charts['chart-outside-temp'] = new Chart(ctx, cfg);
+        })();
+
+        simpleChart('chart-hum',      'Humidity', hums,      'rgb(99,102,241)');
+        simpleChart('chart-light',    'Lux',      lights,    'rgb(245,158,11)');
+        simpleChart('chart-co2',      'CO₂',      co2s,      'rgb(239,68,68)');
+        simpleChart('chart-voc',      'VOC',      vocs,      'rgb(168,85,247)');
+        simpleChart('chart-pressure', 'Pressure', pressures, 'rgb(99,102,241)');
+
+        // AQI: colour-coded bar chart (1=excellent … 5=unhealthy)
+        (function() {
+            var aqiColors = ['', '#10b981', '#84cc16', '#f59e0b', '#ef4444', '#7c3aed'];
+            var barColors = aqis.map(function(v) { return aqiColors[Math.round(v)] || '#94a3b8'; });
+            var ctx = document.getElementById('chart-aqi').getContext('2d');
+            if (charts['chart-aqi']) charts['chart-aqi'].destroy();
+            charts['chart-aqi'] = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'AQI',
+                        data: aqis,
+                        backgroundColor: barColors,
+                        borderWidth: 0,
+                        borderRadius: 3,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    animation: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function(ctx) {
+                                    var names = ['', 'Excellent', 'Good', 'Moderate', 'Poor', 'Unhealthy'];
+                                    return names[Math.round(ctx.parsed.y)] || ctx.parsed.y;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            min: 0, max: 5,
+                            ticks: { stepSize: 1 },
+                            grid: { color: 'rgba(0,0,0,0.06)' }
+                        },
+                        x: { display: hourlyMode, ticks: { color: '#94a3b8', font: { size: 10 } } }
+                    }
+                }
+            });
+        })();
     };
-    xhr.open('GET', '/all_samples', true);
+    xhr.open('GET', endpoint, true);
     xhr.send();
 }
 
@@ -376,6 +494,8 @@ function applyReadings(obj) {
     if (obj.CO2               !== undefined) gaugeCO2.value       = Number(obj.CO2);
     if (obj.VOC               !== undefined) gaugeVOC.value       = Number(obj.VOC);
     if (obj.AQI               !== undefined) gaugeAQI.value       = Number(obj.AQI);
+    if (obj.pressure          !== undefined) gaugePressure.value   = Number(obj.pressure);
+    if (obj.temperature_bmp580 !== undefined) gaugeBmp580Temp.value = Number(obj.temperature_bmp580);
 }
 
 // ── Polling (initial + fallback) ──────────────────────────────────────────────
@@ -428,6 +548,109 @@ function setOtaDelay(btn) {
     xhr.send();
 }
 
+function resetDevice() {
+    if (!confirm('Reset the device now?')) return;
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', '/reset', true);
+    xhr.send();
+
+    var modal = document.getElementById('reset-modal');
+    var countEl = document.getElementById('reset-countdown');
+    modal.style.display = 'flex';
+    var n = 5;
+    countEl.textContent = n;
+    var t = setInterval(function() {
+        n--;
+        countEl.textContent = n;
+        if (n <= 0) {
+            clearInterval(t);
+            window.location.href = '/';
+        }
+    }, 1000);
+}
+
+// ── Sensor enable toggles ─────────────────────────────────────────────────────
+var SENSOR_AHT21   = 1;
+var SENSOR_ENS160  = 2;
+var SENSOR_BH1750  = 4;
+var SENSOR_BMP580  = 8;
+var SENSOR_DS18B20 = 16;
+
+// Maps sensor id -> gauge canvas IDs that depend on it
+var sensorGauges = {
+    aht21:   ['gauge-temperature', 'gauge-humidity'],
+    ens160:  ['gauge-co2', 'gauge-voc', 'gauge-aqi'],
+    bh1750:  ['gauge-light'],
+    bmp580:  ['gauge-pressure', 'gauge-bmp580-temp'],
+    ds18b20: ['gauge-water-temperature'],
+};
+
+function loadSensorStatus() {
+    var xhr = new XMLHttpRequest();
+    xhr.onreadystatechange = function() {
+        if (this.readyState !== 4 || this.status !== 200) return;
+        var s = JSON.parse(this.responseText);
+        var titles = { ok: 'OK', fault: 'Fault — check wiring / I²C bus', disabled: 'Disabled' };
+        var msgs   = { fault: 'sensor fault', disabled: 'disabled' };
+        ['aht21','ens160','bh1750','bmp580','ds18b20'].forEach(function(id) {
+            var dot = document.getElementById('sts-' + id);
+            if (dot) {
+                var st = s[id] || 'fault';
+                dot.className = 'sensor-sts ' + st;
+                dot.title = titles[st] || st;
+            }
+            var inactive = (s[id] === 'fault' || s[id] === 'disabled');
+            var msg = msgs[s[id]] || '';
+            (sensorGauges[id] || []).forEach(function(canvasId) {
+                var canvas = document.getElementById(canvasId);
+                if (!canvas) return;
+                var card = canvas.closest('.card');
+                if (!card) return;
+                if (inactive) {
+                    card.classList.add('sensor-inactive');
+                    var head = card.querySelector('.card-head');
+                    if (head) head.setAttribute('data-inactive-msg', msg);
+                } else {
+                    card.classList.remove('sensor-inactive');
+                    var head = card.querySelector('.card-head');
+                    if (head) head.removeAttribute('data-inactive-msg');
+                }
+            });
+        });
+    };
+    xhr.open('GET', '/sensor_status', true);
+    xhr.send();
+}
+
+function loadSensorMask() {
+    var xhr = new XMLHttpRequest();
+    xhr.onreadystatechange = function() {
+        if (this.readyState !== 4 || this.status !== 200) return;
+        var mask = parseInt(this.responseText.trim());
+        document.getElementById('sen-aht21').checked   = !!(mask & SENSOR_AHT21);
+        document.getElementById('sen-ens160').checked  = !!(mask & SENSOR_ENS160);
+        document.getElementById('sen-bh1750').checked  = !!(mask & SENSOR_BH1750);
+        document.getElementById('sen-bmp580').checked  = !!(mask & SENSOR_BMP580);
+        document.getElementById('sen-ds18b20').checked = !!(mask & SENSOR_DS18B20);
+    };
+    xhr.open('GET', '/get_sensor_enabled', true);
+    xhr.send();
+}
+
+function saveSensorMask() {
+    var mask = 0;
+    if (document.getElementById('sen-aht21').checked)   mask |= SENSOR_AHT21;
+    if (document.getElementById('sen-ens160').checked)  mask |= SENSOR_ENS160;
+    if (document.getElementById('sen-bh1750').checked)  mask |= SENSOR_BH1750;
+    if (document.getElementById('sen-bmp580').checked)  mask |= SENSOR_BMP580;
+    if (document.getElementById('sen-ds18b20').checked) mask |= SENSOR_DS18B20;
+    if (mask === 0) mask = 1; // prevent all-off
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', '/set_sensor_enabled?mask=' + mask, true);
+    xhr.send();
+    document.getElementById('sensor-reset-warning').style.display = 'block';
+}
+
 function setSamplingInterval(ms, btn) {
     document.querySelectorAll('.interval-btn').forEach(function(b) { b.classList.remove('active'); });
     if (btn) btn.classList.add('active');
@@ -439,6 +662,9 @@ function setSamplingInterval(ms, btn) {
 
 window.addEventListener('load', function() {
     getReadings();
+    loadSensorMask();
+    loadSensorStatus();
+    setInterval(loadSensorStatus, 5000);
 
     // Read current sampling interval, sync polling rate, highlight active button
     var xhr = new XMLHttpRequest();
