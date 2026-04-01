@@ -114,24 +114,27 @@ static void handle_hello(AsyncWebServerRequest *request) {
 
 static void handle_get_all_samples(AsyncWebServerRequest *request) {
   char buffer[40];
-  // Drive row count from current_time_buffer (populated by NTP, independent of sensor mask).
-  // Fall back to any non-empty sensor buffer in case NTP hasn't resolved yet.
-  int n = (int)current_time_buffer.size();
-  if (n == 0) n = (int)temperature_buffer.size();
-  if (n == 0) n = (int)pressure_buffer.size();
-  if (n == 0) n = (int)lightIntensity_buffer.size();
-  if (n == 0) n = (int)water_temp_buffer.size();
-  if (n == 0) n = (int)CO2_buffer.size();
+  // Row count from the largest buffer so sensor data is never hidden.
+  int n = 0;
+  n = max(n, (int)current_time_buffer.size());
+  n = max(n, (int)temperature_buffer.size());
+  n = max(n, (int)pressure_buffer.size());
+  n = max(n, (int)lightIntensity_buffer.size());
+  n = max(n, (int)water_temp_buffer.size());
+  n = max(n, (int)CO2_buffer.size());
 
   String ptr = "time, external temp, humidity, water temp, light intensity, AQI, VOC, CO2, pressure, temperature_bmp580\n";
   if (n > 0) {
     for (int i = 0; i < n; i++) {
-      if (i < (int)current_time_buffer.size()) {
-        sprintf(buffer, "%lu", current_time_buffer[i]);
-        ptr += buffer;
-      } else {
-        ptr += "0";
-      }
+      // For rows where the NTP timestamp hasn't arrived yet (sensor callbacks
+      // fire a few seconds before the NTP callback each cycle), fall back to
+      // the last known timestamp rather than emitting "0".
+      unsigned long ts = current_time_buffer.isEmpty() ? 0
+                       : (i < (int)current_time_buffer.size())
+                           ? current_time_buffer[i]
+                           : current_time_buffer.last();
+      sprintf(buffer, "%lu", ts);
+      ptr += buffer;
       ptr += ",";
       ptr += (i < (int)temperature_buffer.size())    ? String(temperature_buffer[i])    : "0";
       ptr += ",";

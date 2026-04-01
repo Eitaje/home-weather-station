@@ -394,11 +394,12 @@ function loadCharts() {
         var xTitle = hourlyMode ? 'Hour' : 'Sample #';
 
         // Simple line chart with data + MA overlay
-        function simpleChart(id, label, data, color) {
+        function simpleChart(id, label, data, color, yOpts) {
             var ctx = document.getElementById(id).getContext('2d');
             if (charts[id]) charts[id].destroy();
             var cfg = JSON.parse(JSON.stringify(chartDefaults));
             cfg.options.scales.x.title.text = xTitle;
+            if (yOpts) Object.assign(cfg.options.scales.y, yOpts);
             cfg.data = {
                 labels: labels,
                 datasets: [
@@ -410,7 +411,7 @@ function loadCharts() {
         }
 
         // Water-tank temperature
-        simpleChart('chart-water-temp', 'Water Tank', waterTemps, 'rgb(5,150,105)');
+        simpleChart('chart-water-temp', 'Water Tank', waterTemps, 'rgb(5,150,105)', { ticks: { stepSize: 0.5, color: '#64748b', font: { size: 10 } } });
 
         // Outside temperature: ENS160 + BMP580 on the same axis
         (function() {
@@ -418,6 +419,7 @@ function loadCharts() {
             if (charts['chart-outside-temp']) charts['chart-outside-temp'].destroy();
             var cfg = JSON.parse(JSON.stringify(chartDefaults));
             cfg.options.scales.x.title.text = xTitle;
+            Object.assign(cfg.options.scales.y, { ticks: { stepSize: 0.5, color: '#64748b', font: { size: 10 } } });
             cfg.data = {
                 labels: labels,
                 datasets: [
@@ -435,7 +437,7 @@ function loadCharts() {
         simpleChart('chart-light',    'Lux',      lights,    'rgb(245,158,11)');
         simpleChart('chart-co2',      'CO₂',      co2s,      'rgb(239,68,68)');
         simpleChart('chart-voc',      'VOC',      vocs,      'rgb(168,85,247)');
-        simpleChart('chart-pressure', 'Pressure', pressures, 'rgb(99,102,241)');
+        simpleChart('chart-pressure', 'Pressure', pressures, 'rgb(99,102,241)', { min: 950, max: 1000 });
 
         // AQI: colour-coded bar chart (1=excellent … 5=unhealthy)
         (function() {

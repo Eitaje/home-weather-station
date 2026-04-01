@@ -211,8 +211,12 @@ void sample_sensor_ENS160_callback() {
   if (aht21_ready) aht.getEvent(&hum, &temp);
 
   if (ens160_ready) {
-    // measure(true) — wait for DATA_READY so we always get a fresh sample.
-    ens160.measure(true);
+    // measure(false) — non-blocking: read whatever data is currently available.
+    // measure(true) polls I2C in an infinite loop until NEWDAT is set; if the
+    // sensor glitches and never asserts NEWDAT, loop() hangs permanently.
+    // The TaskScheduler interval already controls our sampling rate, so there
+    // is no need for an extra blocking wait here.
+    ens160.measure(false);
   }
   uint8_t  new_aqi  = ens160_ready ? ens160.getAQI()  : 0;
   uint16_t new_tvoc = ens160_ready ? ens160.getTVOC() : 0;
@@ -372,17 +376,19 @@ void aggregate_hourly_callback() {
 }
 
 void update_date_time_callback() {
+  unsigned long t = 0;
+
   if (WiFi.status() != WL_CONNECTED) {
     Serial.println("NTP skipped: WiFi not connected");
-    return;
+  } else {
+    t = ntpClient.getUnixTime();
+    if (t == 0) Serial.println("NTP returned 0");
   }
 
-  unsigned long t = ntpClient.getUnixTime();
-  if (t == 0) {
-    Serial.println("NTP returned 0 — skipping");
-    return;
-  }
-
+  // Always push a timestamp so current_time_buffer stays the same size as the
+  // sensor buffers.  On failure, repeat the last known good time (or 0 on
+  // first boot) so every sensor row has a corresponding timestamp entry.
+  if (t == 0 && !current_time_buffer.isEmpty()) t = current_time_buffer.last();
   current_time_buffer.push(t);
 
   if (DEBUG) {
