@@ -667,6 +667,8 @@ window.addEventListener('load', function() {
     loadSensorMask();
     loadSensorStatus();
     setInterval(loadSensorStatus, 5000);
+    loadWifiRssi();
+    setInterval(loadWifiRssi, 5000);
 
     // Read current sampling interval, sync polling rate, highlight active button
     var xhr = new XMLHttpRequest();
@@ -703,6 +705,38 @@ window.addEventListener('load', function() {
     vxhr.open('GET', '/version', true);
     vxhr.send();
 });
+
+// ── WiFi RSSI ─────────────────────────────────────────────────────────────────
+function updateWifiIcons(rssi) {
+    var level = 0;
+    if      (rssi >= -60) level = 4;
+    else if (rssi >= -70) level = 3;
+    else if (rssi >= -80) level = 2;
+    else                  level = 1;
+
+    var quality = ['', 'Weak', 'Fair', 'Good', 'Excellent'][level];
+    var icons = [document.getElementById('wifiIcon'), document.getElementById('wifiIconConfig')];
+    icons.forEach(function(el) { if (el) el.setAttribute('data-level', level); });
+
+    var label = document.getElementById('wifiRssiLabel');
+    if (label) label.textContent = rssi + ' dBm';
+    var val = document.getElementById('wifiRssiValue');
+    if (val) val.textContent = rssi + ' dBm';
+    var qual = document.getElementById('wifiRssiQuality');
+    if (qual) qual.textContent = quality;
+}
+
+function loadWifiRssi() {
+    var xhr = new XMLHttpRequest();
+    xhr.onreadystatechange = function() {
+        if (this.readyState === 4 && this.status === 200) {
+            var rssi = parseInt(this.responseText.trim());
+            if (!isNaN(rssi)) updateWifiIcons(rssi);
+        }
+    };
+    xhr.open('GET', '/wifi_rssi', true);
+    xhr.send();
+}
 
 // ── SSE ───────────────────────────────────────────────────────────────────────
 if (window.EventSource) {

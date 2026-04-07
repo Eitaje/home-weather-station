@@ -86,12 +86,48 @@ static bool initAHT21() {
   return aht21_ready;
 }
 static bool initENS160() {
-  ens160_ready = ens160.begin();
+  // Bypass begin() entirely — it calls Wire.begin() (bus reset), CLRGPR, and
+  // getFirmware() which leaves GET_APPVER active in COMMAND.  Any of these can
+  // block the prediction engine after repeated resets.  Minimal raw sequence:
+  //   RESET → IDLE → NOP command → STD
+  Wire.beginTransmission(ENS160_I2CADDR_1);
+  Wire.write(ENS160_REG_OPMODE);
+  Wire.write(ENS160_OPMODE_RESET);
+  Wire.endTransmission();
+  delay(10);
+
+  Wire.beginTransmission(ENS160_I2CADDR_1);
+  Wire.write(ENS160_REG_OPMODE);
+  Wire.write(ENS160_OPMODE_IDLE);
+  Wire.endTransmission();
+  delay(10);
+
+  Wire.beginTransmission(ENS160_I2CADDR_1);
+  Wire.write(ENS160_REG_COMMAND);
+  Wire.write(ENS160_COMMAND_NOP);
+  Wire.endTransmission();
+  delay(10);
+
+  Wire.beginTransmission(ENS160_I2CADDR_1);
+  Wire.write(ENS160_REG_OPMODE);
+  Wire.write(ENS160_OPMODE_STD);
+  Wire.endTransmission();
+  delay(10);
+
+  // Read back OPMODE to confirm
+  Wire.beginTransmission(ENS160_I2CADDR_1);
+  Wire.write(ENS160_REG_OPMODE);
+  Wire.endTransmission(false);
+  Wire.requestFrom((uint8_t)ENS160_I2CADDR_1, (uint8_t)1);
+  uint8_t opmode = Wire.available() ? Wire.read() : 0xFF;
+  ens160_ready = (opmode == ENS160_OPMODE_STD);
+  Serial.print("ENS160 raw init OPMODE: 0x"); Serial.print(opmode, HEX);
+  Serial.println(ens160_ready ? " OK" : " FAILED");
+
   if (ens160_ready) {
-    ens160.setMode(ENS160_OPMODE_STD);
-    Serial.println("ENS160 OK");
-  } else {
-    Serial.println("ENS160 init failed");
+    AQI_buffer.clear();
+    VOC_buffer.clear();
+    CO2_buffer.clear();
   }
   return ens160_ready;
 }
@@ -211,12 +247,13 @@ void sample_sensor_ENS160_callback() {
   if (aht21_ready) aht.getEvent(&hum, &temp);
 
   if (ens160_ready) {
-    // measure(false) — non-blocking: read whatever data is currently available.
-    // measure(true) polls I2C in an infinite loop until NEWDAT is set; if the
-    // sensor glitches and never asserts NEWDAT, loop() hangs permanently.
-    // The TaskScheduler interval already controls our sampling rate, so there
-    // is no need for an extra blocking wait here.
+    // measure() MUST come first — any read of DATA_STATUS (register 0x20)
+    // clears NEWDAT, so nothing else may touch the sensor before this call.
     ens160.measure(false);
+    // Update compensation after reading so set_envdata() cannot clear NEWDAT.
+    float comp_t = aht21_ready ? temp.temperature : temperature + 3;
+    float comp_h = aht21_ready ? hum.relative_humidity : humidity;
+    ens160.set_envdata(comp_t, comp_h);
   }
   uint8_t  new_aqi  = ens160_ready ? ens160.getAQI()  : 0;
   uint16_t new_tvoc = ens160_ready ? ens160.getTVOC() : 0;
@@ -239,24 +276,17 @@ void sample_sensor_ENS160_callback() {
     }
   }
   if (ens160_ready) {
-    if (new_aqi >= 1 && new_aqi <= 5) {
-      aqi = new_aqi;
-      AQI_buffer.push(new_aqi);
-    } else {
-      Serial.print("Rejected AQI (out of range): "); Serial.println(new_aqi);
-    }
-    if (validateUint16Ratio("TVOC", new_tvoc, 0, 60000, &VOC_buffer, 10.0f)) {
-      tvoc = new_tvoc;
-      VOC_buffer.push(new_tvoc);
-    }
-    if (validateUint16Ratio("CO2", new_eco2, 400, 8192, &CO2_buffer, 3.0f)) {
-      eco2 = new_eco2;
-      CO2_buffer.push(new_eco2);
-    }
     if (DEBUG) {
       Serial.print("AQI: "); Serial.println(new_aqi);
       Serial.print("VOC: "); Serial.println(new_tvoc);
       Serial.print("CO2: "); Serial.println(new_eco2);
+    }
+    // AQI=0 means the sensor is in startup/warm-up — skip these samples.
+    // AQI 1–5 is the valid operating range; only then commit all three values.
+    if (new_aqi >= 1 && new_aqi <= 5) {
+      aqi  = new_aqi;  AQI_buffer.push(new_aqi);
+      tvoc = new_tvoc; VOC_buffer.push(new_tvoc);
+      eco2 = new_eco2; CO2_buffer.push(new_eco2);
     }
   }
 }

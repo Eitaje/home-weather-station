@@ -72,6 +72,27 @@ body {
   gap: 24px;
 }
 
+/* ── WiFi signal icon ── */
+.wifi-signal {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.wifi-rssi-label {
+  font-size: 0.72rem;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  min-width: 54px;
+}
+.wifi-icon .bar { fill: #cbd5e1; transition: fill 0.4s; }
+.wifi-icon[data-level="1"] .b1                          { fill: #dc2626; }
+.wifi-icon[data-level="2"] .b1,
+.wifi-icon[data-level="2"] .b2                          { fill: #f59e0b; }
+.wifi-icon[data-level="3"] .b1,
+.wifi-icon[data-level="3"] .b2,
+.wifi-icon[data-level="3"] .b3                          { fill: #84cc16; }
+.wifi-icon[data-level="4"] .bar                         { fill: #059669; }
+
 .status-pill {
   display: flex;
   align-items: center;

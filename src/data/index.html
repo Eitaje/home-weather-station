@@ -19,6 +19,15 @@
       <div class="logo-sub">Smart Home Dashboard <span id="versionLabel"></span></div>
     </div>
     <div class="header-right">
+      <div class="wifi-signal" title="WiFi reception">
+        <svg id="wifiIcon" class="wifi-icon" viewBox="0 0 20 16" width="20" height="16">
+          <rect class="bar b1" x="0"  y="12" width="3" height="4"  rx="1"/>
+          <rect class="bar b2" x="5"  y="8"  width="3" height="8"  rx="1"/>
+          <rect class="bar b3" x="10" y="4"  width="3" height="12" rx="1"/>
+          <rect class="bar b4" x="15" y="0"  width="3" height="16" rx="1"/>
+        </svg>
+        <span id="wifiRssiLabel" class="wifi-rssi-label">—</span>
+      </div>
       <div class="status-pill">
         <span class="status-dot" id="statusDot"></span>
         <span id="serverState">connecting</span>
@@ -217,6 +226,21 @@
         </div>
       </div>
 
+
+      <div class="section-label">WiFi Reception</div>
+      <div class="card interval-card">
+        <span class="interval-label">Signal strength</span>
+        <div style="display:flex;align-items:center;gap:14px;margin-top:10px">
+          <svg id="wifiIconConfig" class="wifi-icon" viewBox="0 0 20 16" width="28" height="22">
+            <rect class="bar b1" x="0"  y="12" width="3" height="4"  rx="1"/>
+            <rect class="bar b2" x="5"  y="8"  width="3" height="8"  rx="1"/>
+            <rect class="bar b3" x="10" y="4"  width="3" height="12" rx="1"/>
+            <rect class="bar b4" x="15" y="0"  width="3" height="16" rx="1"/>
+          </svg>
+          <span id="wifiRssiValue" style="font-family:var(--font-mono);font-size:1.3rem;font-weight:500;color:var(--text-primary)">—</span>
+          <span id="wifiRssiQuality" style="font-size:0.8rem;color:var(--text-muted)">—</span>
+        </div>
+      </div>
 
       <div class="section-label">Device</div>
       <div class="card interval-card">

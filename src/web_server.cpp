@@ -3,6 +3,7 @@
 #include "sensors.h"
 #include "html_ui.h"
 
+#include <ESP8266WiFi.h>
 #include <ESPAsyncTCP.h>
 #include <ESPAsyncWebServer.h>
 #include <AsyncElegantOTA.h>
@@ -393,6 +394,10 @@ void initWebServer() {
     } else {
       request->send(400, "text/plain", "mask parameter missing");
     }
+  });
+
+  server.on("/wifi_rssi", HTTP_GET, [](AsyncWebServerRequest *request) {
+    request->send(200, "text/plain", String(WiFi.RSSI()));
   });
 
   server.on("/reset", HTTP_GET, [](AsyncWebServerRequest *request) {
