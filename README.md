@@ -148,6 +148,33 @@ src/
   data/                 # LittleFS web UI files
 ```
 
+## Tests
+
+Automated firmware unit tests are not set up (PlatformIO's `test/` folder is the default empty placeholder). All pipeline testing for this device lives in the companion server project's test suite — see `tests/test_history_pipeline.py` in the home automation server repository.
+
+### What is covered on the server side
+
+The server tests exercise the full path from NodeMCU JSON output → Redis storage → history API → UI-parseable response, including edge cases that arise specifically after a firmware deploy:
+
+- History endpoint returns the N **most recent** readings (not oldest)
+- All 9 sensor fields (`temperature`, `humidity`, `water_temperature`, `light`, `CO2`, `VOC`, `AQI`, `pressure`, `temperature_bmp580`) survive the round-trip
+- ENS160 warm-up: AQI/CO2/VOC `= "0"` are returned as numeric zero, not absent
+- Old Redis entries missing `temperature_bmp580` don't crash the endpoint
+- Offline buffer sync with past timestamps (device rebooted while online) does not return HTTP 500
+
+### Manual smoke tests after flashing
+
+After flashing new firmware, verify the following endpoints directly:
+
+| Check | Command |
+|---|---|
+| Sensor values look sane | `curl http://<DEVICE_IP>/curr_readings` |
+| ENS160 initialised | `curl http://<DEVICE_IP>/sensor_status` — `ens160` should be `"ok"`, not `"fault"` |
+| WiFi reconnect log | Open serial monitor, cut power briefly, confirm `[wifi] connected!` appears within ~30 s |
+| Offline buffer sync | Go offline for >1 min, reconnect, check server logs for `[offline] syncing` |
+
+---
+
 ## Architecture Notes
 
 - All periodic work (sampling, NTP, SSE push) runs via **TaskScheduler** — `loop()` only calls `runner.execute()`

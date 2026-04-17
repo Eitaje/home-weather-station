@@ -5,6 +5,14 @@
 const char* ssid     = "your-ssid";
 const char* password = "your-password";
 
+// ── Home automation server (for offline buffer sync) ─────────────────────────
+#define SERVER_IP   "your-server-ip"
+#define SERVER_PORT 8000
+
+// ── Preferred AP BSSID (optional: forces connection to a specific AP/extender) ─
+// Comment out or set to all-zeros to connect to any AP matching the SSID.
+static uint8_t extender_bssid[] = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
+
 // ── Static network config ─────────────────────────────────────────────────────
 // Define each address as four comma-separated octets.
 #define DEVICE_IP   10,  0,  0,  1    // IP assigned to this device

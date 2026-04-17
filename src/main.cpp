@@ -19,6 +19,7 @@
 #include "wifi_manager.h"
 #include "web_server.h"
 #include "html_ui.h"
+#include "offline_buffer.h"
 // pwd.h included only in wifi_manager.cpp to avoid duplicate symbol definitions
 
 // ── Globals ───────────────────────────────────────────────────────────────────
@@ -41,6 +42,17 @@ Task task_update_date_time       (DEFAULT_SAMPLE_RATE, TASK_FOREVER, &update_dat
 Task task_send_new_readings_event(DEFAULT_SAMPLE_RATE, TASK_FOREVER, &send_new_readings_event_callback);
 Task task_check_wifi_connected   (1000,               TASK_FOREVER, &task_check_wifi_connected_callback);
 Task task_hourly_aggregation     (3600000UL,           TASK_FOREVER, &aggregate_hourly_callback);
+
+// Offline buffer: sample every 30 s while WiFi is down
+void offline_sample_callback() {
+  if (WiFi.status() == WL_CONNECTED) return;
+  offlineBuffer_addSample(
+    water_temperature, temperature, temperature_bmp580,
+    humidity, light_intensity,
+    (float)eco2, (float)tvoc, (float)aqi, bmp580_pressure,
+    getApproxUnixTime());
+}
+Task task_offline_sample(30000UL, TASK_FOREVER, &offline_sample_callback);
 
 // ── LittleFS init ─────────────────────────────────────────────────────
 static void initFS() {
@@ -70,6 +82,7 @@ void task_initiator_callback() {
   task_send_new_readings_event.enable();
   task_check_wifi_connected.enable();
   task_hourly_aggregation.enable();
+  task_offline_sample.enable();
   digitalWrite(SSRPin, HIGH);
 }
 
@@ -112,6 +125,7 @@ void setup() {
   runner.addTask(task_send_new_readings_event);
   runner.addTask(task_check_wifi_connected);
   runner.addTask(task_hourly_aggregation);
+  runner.addTask(task_offline_sample);
 
   initWiFi();
   task_initiator.enable();

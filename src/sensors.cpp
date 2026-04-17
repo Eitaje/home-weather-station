@@ -405,6 +405,17 @@ void aggregate_hourly_callback() {
   if (DEBUG) Serial.println("Hourly aggregation stored");
 }
 
+// Tracks when the last NTP sync happened so getApproxUnixTime() can extrapolate
+static unsigned long _last_ntp_ts    = 0;
+static unsigned long _last_ntp_ms    = 0;
+
+unsigned long getApproxUnixTime() {
+  if (_last_ntp_ts == 0) {
+    return current_time_buffer.isEmpty() ? 0 : current_time_buffer.last();
+  }
+  return _last_ntp_ts + (millis() - _last_ntp_ms) / 1000UL;
+}
+
 void update_date_time_callback() {
   unsigned long t = 0;
 
@@ -412,7 +423,12 @@ void update_date_time_callback() {
     Serial.println("NTP skipped: WiFi not connected");
   } else {
     t = ntpClient.getUnixTime();
-    if (t == 0) Serial.println("NTP returned 0");
+    if (t == 0) {
+      Serial.println("NTP returned 0");
+    } else {
+      _last_ntp_ts = t;
+      _last_ntp_ms = millis();
+    }
   }
 
   // Always push a timestamp so current_time_buffer stays the same size as the

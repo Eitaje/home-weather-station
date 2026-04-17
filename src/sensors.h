@@ -37,9 +37,10 @@ extern float temperature_bmp580;
 
 extern uint8_t sensor_enabled_mask;
 
-void   initSensors();
-String getSensorReadings();
-String getSensorStatus();
+void          initSensors();
+String        getSensorReadings();
+String        getSensorStatus();
+unsigned long getApproxUnixTime();   // last NTP time + elapsed millis
 
 void sample_sensor_ENS160_callback();
 void sample_sensor_water_temp_callback();
